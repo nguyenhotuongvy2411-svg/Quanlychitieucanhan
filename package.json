@@ -1,0 +1,28 @@
+{
+  "name": "quanlychitieucanhan",
+  "version": "1.0.0",
+  "description": "Ứng dụng quản lý chi tiêu cá nhân",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js"
+  },
+  "keywords": ["finance", "expense", "management", "nodejs", "mongodb"],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^4.18.2",
+    "mongoose": "^7.5.0",
+    "ejs": "^3.1.9",
+    "bcryptjs": "^2.4.3",
+    "jsonwebtoken": "^9.0.2",
+    "express-session": "^1.17.3",
+    "connect-flash": "^0.1.1",
+    "express-validator": "^7.0.1",
+    "method-override": "^3.0.0",
+    "dotenv": "^16.3.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  }
+}
