@@ -1,26 +1,17 @@
 const express = require('express');
 const router = express.Router();
-const { ensureAuthenticated } = require('../middleware/auth');
 
-// Trang chủ
-router.get('/', (req, res) => {
-  if (req.session.user) {
-    res.redirect('/dashboard');
-  } else {
-    res.render('index', {
-      title: 'Quản Lý Chi Tiêu Cá Nhân',
-      user: req.session.user
-    });
-  }
-});
-
-// Dashboard - yêu cầu đăng nhập
-router.get('/dashboard', ensureAuthenticated, async (req, res) => {
+// API endpoint cho dashboard
+router.get('/dashboard', async (req, res) => {
   try {
     const { Transaction, Category, Budget, Goal } = require('../models');
 
-    // Lấy dữ liệu thống kê
-    const userId = req.session.user._id;
+    // Giả sử userId từ query param hoặc body, ví dụ ?userId=...
+    const userId = req.query.userId; // Thay đổi theo nhu cầu
+
+    if (!userId) {
+      return res.status(400).json({ error: 'userId is required' });
+    }
 
     // Tổng thu nhập và chi tiêu trong tháng này
     const currentMonth = new Date();
@@ -54,9 +45,7 @@ router.get('/dashboard', ensureAuthenticated, async (req, res) => {
       .sort({ deadline: 1 })
       .limit(3);
 
-    res.render('dashboard', {
-      title: 'Dashboard',
-      user: req.session.user,
+    res.json({
       stats: {
         income: incomeStats?.total || 0,
         expense: expenseStats?.total || 0,
@@ -69,9 +58,13 @@ router.get('/dashboard', ensureAuthenticated, async (req, res) => {
 
   } catch (error) {
     console.error('Dashboard error:', error);
-    req.flash('error_msg', 'Có lỗi xảy ra khi tải dashboard');
-    res.redirect('/');
+    res.status(500).json({ error: 'Có lỗi xảy ra khi tải dashboard' });
   }
+});
+
+// Trang chủ - trả về message
+router.get('/', (req, res) => {
+  res.json({ message: 'API Quản Lý Chi Tiêu Cá Nhân' });
 });
 
 module.exports = router;

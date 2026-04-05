@@ -9,5 +9,5 @@ module.exports = {
   Category,
   Transaction,
   Budget,
-  Goal
+  Goal,
 };
