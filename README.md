@@ -1,17 +1,77 @@
-# Quản Lý Chi Tiêu Cá Nhân
+# Quản Lý Tài Chính Cá Nhân
 
-Ứng dụng web quản lý tài chính cá nhân được xây dựng bằng Node.js, Express.js, MongoDB và EJS.
+Ứng dụng quản lý tài chính cá nhân với các chức năng quản lý người dùng, giao dịch, danh mục, ngân sách, mục tiêu, báo cáo và thống kê.
 
-## ✨ Tính năng
+## Chức năng chính
 
-- 🔐 **Đăng nhập/Đăng ký** - Hệ thống xác thực người dùng an toàn
-- 💰 **Quản lý giao dịch** - Theo dõi thu nhập và chi tiêu
-- 📊 **Ngân sách thông minh** - Đặt giới hạn chi tiêu theo danh mục
-- 🎯 **Mục tiêu tài chính** - Theo dõi tiến độ đạt mục tiêu
-- 📈 **Dashboard** - Tổng quan tài chính với biểu đồ và thống kê
-- 📱 **Responsive** - Giao diện thân thiện trên mọi thiết bị
+### 1. Quản lý người dùng
+- Đăng ký tài khoản với `name`, `email`, `password`, `currency`
+- Đăng nhập bằng JWT
+- Cập nhật thông tin cá nhân: `name`, `email`, `password`, `currency`
+- Xem thông tin tài khoản: `name`, `email`, `currency`
 
-## 🚀 Cài đặt và chạy
+### 2. Quản lý giao dịch
+- Thêm mới giao dịch: `income`, `expense`, `transfer`
+- Thông tin giao dịch: `amount`, `category`, `description`, `date`, `paymentMethod`
+- Sửa và xóa giao dịch
+- Tìm kiếm giao dịch theo danh mục và khoảng thời gian
+- Sắp xếp giao dịch theo `amount` (tăng/giảm) hoặc `date`
+- Lọc giao dịch theo `type` (income/expense/transfer), `category`, `paymentMethod`
+
+### 3. Quản lý danh mục
+- CRUD danh mục thu/chi (ví dụ: ăn uống, di chuyển, lương, giải trí)
+- Mỗi danh mục gắn với loại `income` hoặc `expense`
+- Kiểm tra tồn tại danh mục để tránh trùng lặp khi thêm mới
+
+### 4. Quản lý ngân sách
+- Tạo, sửa, xóa ngân sách theo danh mục và tháng/năm
+- Thiết lập `BAmount` cho mỗi danh mục
+- Tự động cộng dồn chi tiêu `expense` vào ngân sách tương ứng
+- Cảnh báo khi chi tiêu vượt quá ngân sách hoặc khi còn lại dưới mức an toàn
+- Hiển thị báo cáo số tiền còn lại trong mỗi ngân sách
+
+### 5. Quản lý mục tiêu
+- Tạo mục tiêu tiết kiệm: `name`, `targetAmount`, `deadline`
+- Hiển thị danh sách mục tiêu, tìm kiếm theo tên, sắp xếp theo hạn
+- Cập nhật và xóa mục tiêu
+- Mỗi khi người dùng tạo giao dịch kiểu `transfer`, giá trị `GAmount` sẽ tăng dần
+- So sánh `GAmount` với `goal` để đánh giá tiến độ hoàn thành
+
+### 6. Báo cáo và thống kê
+- Tổng thu, tổng chi theo tháng
+- Số dư theo ngày: `total income - total expense` đến ngày chọn
+- Top 3 danh mục chi tiêu nhiều nhất trong tháng
+- Báo cáo số tiền còn lại trong mỗi ngân sách
+- Tiến độ hoàn thành mục tiêu tiết kiệm: `% hoàn thành`, `amount saved`, `amount remaining`
+- Thống kê chi tiêu theo tuần (nhóm theo ngày trong tuần, tổng tiền, tổng lần chi, trung bình chi tiêu)
+- Liệt kê chi tiết chi tiêu theo từng ngày trong tuần
+
+## Truy vấn/Analytics (ghi chú độ khó)
+- [Ag] Lấy tất cả người dùng và tổng giao dịch của từng người
+- [Ag] Tổng chi theo từng danh mục trong tháng
+- [D] Tìm giao dịch có số tiền lớn hơn mức trung bình của user
+- [D] Lấy danh sách giao dịch kèm tổng tiền
+- [Ag] Tìm danh mục chi tiêu cao nhất trong tháng
+- [D] Tổng tiền tiết kiệm được trong mục tiêu
+- [Ag] Tổng thu, tổng chi theo tháng (chung chung, không theo danh mục)
+- [Ag/D] Số dư theo ngày cụ thể (kể cả hiện tại)
+- [Ag] Top 3 danh mục chi tiêu nhiều nhất trong tháng (sử dụng `$lookup`)
+- [D] Tiến độ hoàn thành mục tiêu
+- [Ag] Thống kê chi tiêu theo ngày trong tuần (phân tích xu hướng)
+- [Ag] Tổng hợp báo cáo tài chính cá nhân theo tháng
+- [D] Tìm giao dịch theo danh mục/khoảng thời gian
+- [D] Lọc giao dịch theo loại/danh mục/phương thức thanh toán
+- [D] Sắp xếp giao dịch theo số tiền/ngày
+- [D] Kiểm tra danh mục tồn tại khi thêm mới
+- [Ag] Lấy danh sách ngân sách kèm cảnh báo (còn bao nhiêu tiền trong ngân sách)
+- [Ag] Tổng hợp số tiền còn lại trong mỗi ngân sách đến thời điểm hiện tại
+- [D] Tìm mục tiêu theo tên
+- [D] Sắp xếp mục tiêu theo hạn
+- [Ag] Liệt kê chi tiêu chi tiết theo từng ngày trong tuần
+
+> Ghi chú: Các đề mục có `(D)` là dễ, `(Ag)` là nâng cao.
+
+## Cài đặt và chạy
 
 ### Yêu cầu hệ thống
 - Node.js (v14 trở lên)
@@ -37,56 +97,45 @@
 
 4. **Chạy ứng dụng:**
    ```bash
-   # Development mode
    npm run dev
-
-   # Production mode
-   npm start
    ```
 
-5. **Truy cập ứng dụng:**
-   - Mở trình duyệt và truy cập: `http://localhost:3000`
+5. **Truy cập:**
+   - `http://localhost:3000`
 
-## 📁 Cấu trúc dự án
+## Cấu trúc dự án
 
-```
-quanlychitieucanhan/
-├── models/                 # Mongoose models
-│   ├── User.js            # Model người dùng
-│   ├── Category.js        # Model danh mục
-│   ├── Transaction.js     # Model giao dịch
-│   ├── Budget.js          # Model ngân sách
-│   ├── Goal.js            # Model mục tiêu
-│   └── index.js           # Export tất cả models
-├── routes/                 # Express routes
-│   ├── index.js           # Trang chủ và dashboard
-│   └── auth.js            # Authentication routes
-├── views/                  # EJS templates
-│   ├── partials/          # Layout components
-│   │   ├── navbar.ejs     # Navigation bar
-│   │   └── footer.ejs     # Footer
-│   ├── auth/              # Authentication views
-│   │   ├── login.ejs      # Trang đăng nhập
-│   │   └── register.ejs   # Trang đăng ký
-│   ├── index.ejs          # Trang chủ
-│   ├── dashboard.ejs      # Dashboard
-│   └── layout.ejs         # Main layout
-├── public/                 # Static files
-│   ├── css/
-│   │   └── style.css      # Custom styles
-│   └── js/
-│       └── main.js        # Client-side JavaScript
-├── middleware/             # Express middleware
-│   └── auth.js            # Authentication middleware
-├── .env                    # Environment variables
-├── package.json            # Dependencies và scripts
-├── server.js               # Main application file
-└── README.md               # Documentation
-```
+- `models/` - Mongoose models cho User, Category, Transaction, Budget, Goal
+- `routes/` - Express routes
+- `views/` - EJS templates
+- `public/` - Static files
+- `middleware/` - Middleware xác thực
+- `server.js` - Main application entrypoint
 
-## 🔧 Cấu hình
+## Mô tả các module chính
 
-### Biến môi trường (.env)
+### User
+- Đăng ký, đăng nhập JWT, cập nhật profile, xem thông tin
+
+### Transaction
+- Thêm/sửa/xóa giao dịch
+- Tìm kiếm, lọc, sắp xếp giao dịch
+
+### Category
+- CRUD danh mục thu/chi
+- Kiểm tra trùng danh mục
+
+### Budget
+- Quản lý ngân sách theo tháng/năm
+- Cảnh báo khi chi tiêu vượt hạn mức
+- Báo cáo số tiền còn lại
+
+### Goal
+- Quản lý mục tiêu tiết kiệm
+- Tiến độ hoàn thành theo `targetAmount`
+- Tìm kiếm và sắp xếp mục tiêu
+
+## Biến môi trường
 
 ```env
 NODE_ENV=development
@@ -95,212 +144,51 @@ MONGODB_URI=mongodb://localhost:27017/quanlychitieucanhan
 SESSION_SECRET=your-secret-key-here
 ```
 
-### Cấu hình MongoDB
-
-Ứng dụng sử dụng MongoDB để lưu trữ dữ liệu. Bạn có thể:
-
-1. **MongoDB Local:**
-   - Cài đặt MongoDB Community Server
-   - Mặc định: `mongodb://localhost:27017/quanlychitieucanhan`
-
-2. **MongoDB Atlas (Cloud):**
-   - Tạo cluster trên MongoDB Atlas
-   - Lấy connection string và cập nhật `MONGODB_URI`
-
-## 🎨 Giao diện
-
-### Trang chủ
-- Landing page với giới thiệu tính năng
-- Call-to-action buttons cho đăng ký/đăng nhập
-
-### Đăng nhập/Đăng ký
-- Form validation phía client và server
-- Password strength indicator
-- Responsive design
-
-### Dashboard
-- Tổng quan tài chính tháng hiện tại
-- Giao dịch gần đây
-- Ngân sách và mục tiêu đang hoạt động
-- Quick actions
-
-## 🔒 Bảo mật
-
-- **Password hashing** với bcrypt
-- **Session-based authentication**
-- **Input validation** với express-validator
-- **XSS protection** với proper escaping
-- **CSRF protection** (có thể thêm sau)
-
-## 📊 API Endpoints
+## Các endpoint chính
 
 ### Authentication
-- `GET /auth/login` - Trang đăng nhập
-- `POST /auth/login` - Xử lý đăng nhập
-- `GET /auth/register` - Trang đăng ký
-- `POST /auth/register` - Xử lý đăng ký
-- `GET /auth/logout` - Đăng xuất
+- `POST /auth/register`
+- `POST /auth/login`
+- `PUT /auth/profile`
+- `GET /auth/profile`
+- `GET /auth/logout`
 
-### Main Routes
-- `GET /` - Trang chủ
-- `GET /dashboard` - Dashboard (yêu cầu đăng nhập)
+### Transaction
+- `POST /transactions`
+- `PUT /transactions/:id`
+- `DELETE /transactions/:id`
+- `GET /transactions`
 
-## 🚀 Tính năng sắp tới
+### Category
+- `POST /categories`
+- `PUT /categories/:id`
+- `DELETE /categories/:id`
+- `GET /categories`
 
-- [ ] Quản lý danh mục chi tiêu/thu nhập
-- [ ] Thêm/sửa/xóa giao dịch
-- [ ] Báo cáo và biểu đồ chi tiết
-- [ ] Xuất dữ liệu Excel/PDF
-- [ ] Nhắc nhở ngân sách
-- [ ] Đồng bộ hóa đa thiết bị
-- [ ] API RESTful
-- [ ] Mobile app
+### Budget
+- `POST /budgets`
+- `PUT /budgets/:id`
+- `DELETE /budgets/:id`
+- `GET /budgets`
 
-## 🛠️ Công nghệ sử dụng
+### Goal
+- `POST /goals`
+- `PUT /goals/:id`
+- `DELETE /goals/:id`
+- `GET /goals`
 
-- **Backend:** Node.js, Express.js
-- **Database:** MongoDB với Mongoose ODM
-- **Frontend:** EJS templates, Bootstrap 5, Vanilla JavaScript
-- **Authentication:** Session-based với express-session
-- **Validation:** express-validator
-- **Styling:** Bootstrap 5, Custom CSS
-- **Icons:** Font Awesome
+## Gợi ý triển khai
 
-## 📝 License
+- Dùng JWT cho xác thực người dùng
+- Mỗi `Transaction` liên kết với `userId` và `categoryId`
+- Budget ghi nhận `BAmount` và `spentAmount`
+- Goal ghi nhận `GAmount` và `targetAmount`
+- Dùng aggregation MongoDB để xây báo cáo nâng cao
 
-MIT License - Xem file LICENSE để biết thêm chi tiết.
+## Ghi chú
 
-## 🤝 Đóng góp
-
-Mọi đóng góp đều được chào đón! Vui lòng:
-
-1. Fork dự án
-2. Tạo feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to branch (`git push origin feature/AmazingFeature`)
-5. Tạo Pull Request
-
-## 📞 Liên hệ
-
-- Email: your-email@example.com
-- GitHub: [your-github-username](https://github.com/your-github-username)
-- LinkedIn: [your-linkedin-profile](https://linkedin.com/in/your-linkedin-profile)
-
----
-
-**Lưu ý:** Đây là phiên bản beta. Một số tính năng có thể chưa hoàn thiện. Vui lòng báo cáo bugs và góp ý để cải thiện ứng dụng!
-- `paymentMethod` - Phương thức thanh toán (cash, credit_card, debit_card, bank_transfer, other)
-- `note` - Ghi chú
-- `tags` - Từ khóa
-- `status` - Trạng thái (pending, completed, cancelled)
-- `attachments` - Tệp đính kèm
-
-**Chỉ mục:**
-- `userId` + `date`
-- `userId` + `categoryId`
-- `userId` + `type`
-
----
-
-### 4. **Budget Model** (Budget.js)
-Quản lý ngân sách hàng tháng
-
-**Các trường chính:**
-- `userId` - ID người dùng
-- `categoryId` - ID danh mục
-- `name` - Tên ngân sách
-- `limitAmount` - Giới hạn chi tiêu
-- `spentAmount` - Số tiền đã chi
-- `month` - Tháng (YYYY-MM)
-- `year` - Năm
-- `alertThreshold` - Ngưỡng cảnh báo (0-100%)
-- `isAlert` - Đã cảnh báo?
-- `status` - Trạng thái (active, completed, paused)
-
-**Các trường ảo (Virtual):**
-- `usagePercentage` - Phần trăm đã dùng
-
-**Chỉ mục:**
-- `userId` + `month`
-- `userId` + `categoryId`
-
----
-
-### 5. **Goal Model** (Goal.js)
-Quản lý mục tiêu tài chính
-
-**Các trường chính:**
-- `userId` - ID người dùng
-- `name` - Tên mục tiêu
-- `description` - Mô tả
-- `targetAmount` - Số tiền mục tiêu
-- `currentAmount` - Số tiền đã tiết kiệm
-- `category` - Loại mục tiêu (savings, investment, education, travel, home, car, health, other)
-- `priority` - Ưu tiên (low, medium, high)
-- `deadline` - Thời hạn hoàn thành
-- `status` - Trạng thái (active, on-hold, completed, cancelled)
-- `icon` - Biểu tượng
-- `color` - Màu sắc
-- `completedAt` - Ngày hoàn thành
-
-**Các trường ảo (Virtual):**
-- `progressPercentage` - Phần trăm hoàn thành
-- `daysRemaining` - Số ngày còn lại
-- `isOverdue` - Đã quá hạn?
-
-**Chỉ mục:**
-- `userId` + `status`
-- `userId` + `deadline`
-
----
-
-## Cách sử dụng
-
-### Import các models
-```javascript
-// Từ file index.js
-const { User, Category, Transaction, Budget, Goal } = require('./models');
-
-// Hoặc import trực tiếp
-const User = require('./models/User');
-const Transaction = require('./models/Transaction');
-```
-
-### Ví dụ tạo giao dịch mới
-```javascript
-const transaction = await Transaction.create({
-  userId: '660a1f2b3c4d5e6f7g8h9i0j',
-  categoryId: '660a1f2b3c4d5e6f7g8h9i0k',
-  amount: 50000,
-  type: 'expense',
-  description: 'Mua cơm trưa',
-  date: new Date(),
-  paymentMethod: 'cash'
-});
-```
-
-### Ví dụ tạo mục tiêu
-```javascript
-const goal = await Goal.create({
-  userId: '660a1f2b3c4d5e6f7g8h9i0j',
-  name: 'Tiết kiệm cho du lịch',
-  targetAmount: 10000000,
-  currentAmount: 0,
-  category: 'travel',
-  priority: 'high',
-  deadline: new Date('2026-12-31')
-});
-```
-
----
-
-## Yêu cầu
-- Node.js
-- MongoDB
-- Mongoose
-- bcryptjs (để mã hóa mật khẩu)
-
-## Cài đặt dependencies
-```bash
-npm install mongoose bcryptjs
-```
+- Phân biệt rõ `income`, `expense`, `transfer`
+- `transfer` dùng cho tiết kiệm/mục tiêu nội bộ
+- Mỗi danh mục chỉ thuộc một loại: `income` hoặc `expense`
+- Mục tiêu tiết kiệm chỉ tăng khi giao dịch `transfer`
+- Ngân sách chỉ giảm khi giao dịch `expense`
