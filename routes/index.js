@@ -4,7 +4,7 @@ const router = express.Router();
 // API endpoint cho dashboard
 router.get('/dashboard', async (req, res) => {
   try {
-    const { Transaction, Category, Budget, Goal } = require('../models');
+    const { Transaction, Category, Budget, Goal } = require('../Models');
 
     // Giả sử userId từ query param hoặc body, ví dụ ?userId=...
     const userId = req.query.userId; // Thay đổi theo nhu cầu
