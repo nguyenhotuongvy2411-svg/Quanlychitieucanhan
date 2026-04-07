@@ -191,3 +191,30 @@ exports.getTransactions = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
+
+// câu 14: Sắp xếp giao dịch theo số tiền hoặc ngày
+exports.sortTransactions = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    // Lấy tham số từ query string: ?sortBy=amount&order=desc
+    const { sortBy, order } = req.query;
+    // Mặc định: sắp xếp theo ngày mới nhất trước
+    let sortField = sortBy || 'date';
+    let sortOrder = order === 'asc' ? 1 : -1; // -1: giảm dần, 1: tăng dần
+    // Tạo object sort
+    let sortObject = {};
+    sortObject[sortField] = sortOrder;
+    const transactions = await Transaction.find({ userId: userId })
+      .populate('categoryId', 'name icon type')
+      .sort(sortObject);
+    res.json({
+      success: true,
+      count: transactions.length,
+      sortBy: sortField,
+      order: sortOrder === 1 ? 'asc' : 'desc',
+      transactions: transactions
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+};

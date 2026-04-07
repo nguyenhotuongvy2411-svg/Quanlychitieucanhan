@@ -62,3 +62,98 @@ exports.deleteGoal = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
+
+// câu 6: Tổng tiền tiết kiệm được (trong các mục tiêu)
+exports.getTotalSaved = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    // Tính tổng currentAmount của tất cả mục tiêu của user
+    const result = await Goal.aggregate([
+      { $match: { userId: userId } },
+      {
+        $group: {
+          _id: null,
+          totalSaved: { $sum: "$currentAmount" }
+        }
+      }
+    ]);
+    const totalSaved = result[0]?.totalSaved || 0;
+    res.json({
+      success: true,
+      totalSaved: totalSaved
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// [D] CÂU 10: Tiến độ hoàn thành mục tiêu
+exports.getGoalProgress = async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    // Lấy tất cả mục tiêu của user và tính tiến độ
+    const goals = await Goal.aggregate([
+      { $match: { userId: userId } },
+      {
+        $project: {
+          _id: 1,
+          name: 1,
+          targetAmount: 1,
+          currentAmount: 1,
+          deadline: 1,
+          status: 1,
+          // Tính phần trăm tiến độ
+          progress: {
+            $multiply: [
+              { $divide: ["$currentAmount", "$targetAmount"] },
+              100
+            ]
+          },
+          // Tính số tiền còn thiếu
+          remaining: {
+            $subtract: ["$targetAmount", "$currentAmount"]
+          }
+        }
+      },
+      { $sort: { progress: -1 } } // Sắp xếp mục tiêu gần hoàn thành lên đầu
+    ]);
+
+    res.json({
+      success: true,
+      count: goals.length,
+      goals: goals
+    });
+
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// câu 18: Tìm mục tiêu theo tên (tìm kiếm gần đúng, không phân biệt hoa thường)
+exports.searchGoalsByName = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { keyword } = req.query; // Lấy từ khóa từ query string
+    // Kiểm tra nếu không có keyword
+    if (!keyword) {
+      return res.status(400).json({
+        success: false,
+        message: "Vui lòng nhập từ khóa cần tìm"
+      });
+    }
+    // Tìm mục tiêu theo tên (không phân biệt hoa/thường, tìm kiếm gần đúng)
+    const goals = await Goal.find({
+      userId: userId,
+      name: { $regex: keyword, $options: "i" } // i: case-insensitive
+    }).sort({ createdAt: -1 }); // Sắp xếp mới nhất trước
+    res.json({
+      success: true,
+      count: goals.length,
+      keyword: keyword,
+      goals: goals
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
