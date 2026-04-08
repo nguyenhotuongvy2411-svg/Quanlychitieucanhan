@@ -157,3 +157,25 @@ exports.searchGoalsByName = async (req, res) => {
     res.status(500).json({ success: false, error: error.message });
   }
 };
+
+// câu 19: Sắp xếp mục tiêu theo hạn (deadline gần nhất trước)
+exports.sortGoalsByDeadline = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { order } = req.query; // 'asc' hoặc 'desc', mặc định asc (gần nhất trước)
+    const sortOrder = order === 'desc' ? -1 : 1;
+    
+    const goals = await Goal.find({ userId })
+      .sort({ deadline: sortOrder });
+    
+    res.json({
+      success: true,
+      count: goals.length,
+      sortedBy: 'deadline',
+      order: sortOrder === 1 ? 'asc' : 'desc',
+      goals
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+};

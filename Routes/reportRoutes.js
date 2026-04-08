@@ -1,5 +1,19 @@
 const express = require('express');
-const { summaryByMonth, balanceUpToDate, topExpenseCategories, budgetRemaining, goalProgress, averageSpendingByWeekday, getTransactionsWithTotals, getExpenseByCategoryInMonth, getTop3ExpenseCategories, getExpenseByDayOfWeek } = require('../Controllers/reportController');
+const { summaryByMonth, 
+        balanceUpToDate, 
+        topExpenseCategories, 
+        budgetRemaining, 
+        goalProgress, 
+        averageSpendingByWeekday, 
+        getTransactionsWithTotals, 
+        getExpenseByCategoryInMonth, 
+        getTop3ExpenseCategories, 
+        getExpenseByDayOfWeek,
+        getHighestExpenseCategory,
+        getMonthlySummary, 
+        getBalanceOnDate, 
+        getWeeklyTrend, 
+        getMonthlyFinancialReport } = require('../Controllers/reportController');
 const { protect } = require('../Middleware/Auth');
 const router = express.Router();
 
@@ -14,5 +28,10 @@ router.get('/transactions-with-totals', getTransactionsWithTotals); // câu 4: L
 router.get('/expense-by-category', getExpenseByCategoryInMonth); // câu 2: Tổng chi theo từng danh mục trong tháng
 router.get('/top-3', getTop3ExpenseCategories); // câu 9: Top 3 danh mục chi tiêu nhiều nhất trong tháng
 router.get('/expense', getExpenseByDayOfWeek); // câu 20: Liệt kê chi tiêu chi tiết theo từng ngày trong tuần
+router.get('/highest-expense-category', getHighestExpenseCategory); // câu 5
+router.get('/monthly-summary', getMonthlySummary); // câu 7
+router.get('/balance-on-date', getBalanceOnDate); // câu 8
+router.get('/weekly-trend', getWeeklyTrend); // câu 11
+router.get('/monthly-report', getMonthlyFinancialReport); // câu 12
 
 module.exports = router;

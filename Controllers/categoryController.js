@@ -53,3 +53,27 @@ exports.deleteCategory = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
+
+// câu 15: Kiểm tra danh mục đã tồn tại (theo tên, loại, userId)
+exports.checkCategoryExists = async (req, res) => {
+  try {
+    const { name, type } = req.query;
+    if (!name || !type) {
+      return res.status(400).json({ success: false, error: "Vui lòng cung cấp name và type" });
+    }
+    
+    const existing = await Category.findOne({
+      userId: req.user.id,
+      name: { $regex: new RegExp(`^${name}$`, 'i') }, // không phân biệt hoa thường
+      type
+    });
+    
+    res.json({
+      success: true,
+      exists: !!existing,
+      category: existing || null
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+};

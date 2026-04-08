@@ -1,5 +1,5 @@
 const express = require('express');
-const { createTransaction, updateTransaction, deleteTransaction, getTransactions, sortTransactions } = require('../Controllers/transactionController');
+const { createTransaction, updateTransaction, deleteTransaction, getTransactions, sortTransactions, getTransactionsAboveAverage } = require('../Controllers/transactionController');
 const { protect } = require('../Middleware/Auth');
 const router = express.Router();
 
@@ -9,5 +9,6 @@ router.get('/', getTransactions);
 router.put('/:id', updateTransaction);
 router.delete('/:id', deleteTransaction);
 router.get('/sort', sortTransactions); // câu 14: Sắp xếp giao dịch theo số tiền hoặc ngày
+router.get('/above-average', getTransactionsAboveAverage); // câu 3
 
 module.exports = router;

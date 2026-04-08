@@ -218,3 +218,36 @@ exports.sortTransactions = async (req, res) => {
     res.status(500).json({ success: false, error: error.message });
   }
 };
+
+// câu 3: Tìm giao dịch có số tiền lớn hơn mức trung bình của user
+exports.getTransactionsAboveAverage = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    
+    // Tính số tiền trung bình của tất cả giao dịch của user (không phân biệt loại)
+    const avgResult = await Transaction.aggregate([
+      { $match: { userId: userId } },
+      { $group: { _id: null, avgAmount: { $avg: "$amount" } } }
+    ]);
+    
+    const avgAmount = avgResult[0]?.avgAmount || 0;
+    
+    // Lấy các giao dịch có amount > avgAmount
+    const transactions = await Transaction.find({ 
+      userId: userId, 
+      amount: { $gt: avgAmount } 
+    })
+    .populate('categoryId', 'name type icon')
+    .populate('goalId', 'name')
+    .sort({ amount: -1 });
+    
+    res.json({
+      success: true,
+      averageAmount: avgAmount,
+      count: transactions.length,
+      transactions: transactions
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+};

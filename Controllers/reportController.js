@@ -511,3 +511,242 @@ exports.getExpenseByDayOfWeek = async (req, res) => {
     res.status(500).json({ success: false, error: error.message });
   }
 };
+
+// câu 5: Tìm danh mục chi tiêu cao nhất trong tháng
+exports.getHighestExpenseCategory = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { month, year } = req.query;
+    const currentDate = new Date();
+    const selectedMonth = month ? parseInt(month) : currentDate.getMonth() + 1;
+    const selectedYear = year ? parseInt(year) : currentDate.getFullYear();
+    
+    const startDate = new Date(selectedYear, selectedMonth - 1, 1);
+    const endDate = new Date(selectedYear, selectedMonth, 0, 23, 59, 59);
+    
+    const result = await Transaction.aggregate([
+      {
+        $match: {
+          userId: userId,
+          type: "expense",
+          date: { $gte: startDate, $lte: endDate }
+        }
+      },
+      {
+        $lookup: {
+          from: "categories",
+          localField: "categoryId",
+          foreignField: "_id",
+          as: "category"
+        }
+      },
+      { $unwind: "$category" },
+      {
+        $group: {
+          _id: {
+            categoryId: "$category._id",
+            categoryName: "$category.name",
+            categoryIcon: "$category.icon"
+          },
+          totalAmount: { $sum: "$amount" }
+        }
+      },
+      { $sort: { totalAmount: -1 } },
+      { $limit: 1 }
+    ]);
+    
+    if (result.length === 0) {
+      return res.json({ success: true, message: "Không có giao dịch chi trong tháng", category: null });
+    }
+    
+    res.json({
+      success: true,
+      period: { month: selectedMonth, year: selectedYear },
+      highestCategory: result[0]
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// câu 7: Tổng thu, tổng chi theo tháng (không theo danh mục)
+exports.getMonthlySummary = async (req, res) => {
+  try {
+    const { year, month } = req.query;
+    const startDate = new Date(year, month - 1, 1);
+    const endDate = new Date(year, month, 0);
+    
+    const result = await Transaction.aggregate([
+      { $match: { userId: req.user._id, date: { $gte: startDate, $lte: endDate } } },
+      { $group: { _id: '$type', total: { $sum: '$amount' } } }
+    ]);
+    
+    const income = result.find(r => r._id === 'income')?.total || 0;
+    const expense = result.find(r => r._id === 'expense')?.total || 0;
+    
+    res.json({
+      success: true,
+      year: parseInt(year),
+      month: parseInt(month),
+      income,
+      expense,
+      balance: income - expense
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// câu 8: Số dư theo ngày cụ thể (kể cả hiện tại)
+exports.getBalanceOnDate = async (req, res) => {
+  try {
+    const { date } = req.query;
+    let upTo;
+    if (date) {
+      upTo = new Date(date);
+      if (isNaN(upTo.getTime())) {
+        return res.status(400).json({ success: false, error: "Ngày không hợp lệ" });
+      }
+    } else {
+      upTo = new Date(); // hiện tại
+    }
+    
+    const result = await Transaction.aggregate([
+      { $match: { userId: req.user._id, date: { $lte: upTo } } },
+      { $group: { _id: '$type', total: { $sum: '$amount' } } }
+    ]);
+    
+    const income = result.find(r => r._id === 'income')?.total || 0;
+    const expense = result.find(r => r._id === 'expense')?.total || 0;
+    
+    res.json({
+      success: true,
+      date: upTo,
+      balance: income - expense
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// câu 11: Thống kê chi tiêu theo ngày trong tuần (phân tích xu hướng)
+exports.getWeeklyTrend = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { startDate, endDate } = req.query;
+    
+    let matchCondition = { userId: userId, type: "expense" };
+    if (startDate && endDate) {
+      matchCondition.date = { $gte: new Date(startDate), $lte: new Date(endDate) };
+    }
+    
+    const result = await Transaction.aggregate([
+      { $match: matchCondition },
+      {
+        $group: {
+          _id: { $dayOfWeek: "$date" },
+          totalSpent: { $sum: "$amount" },
+          count: { $sum: 1 }
+        }
+      },
+      {
+        $project: {
+          dayOfWeek: "$_id",
+          totalSpent: 1,
+          count: 1,
+          averageSpent: { $divide: ["$totalSpent", "$count"] }
+        }
+      },
+      { $sort: { dayOfWeek: 1 } }
+    ]);
+    
+    const weekdays = ["Chủ nhật", "Thứ hai", "Thứ ba", "Thứ tư", "Thứ năm", "Thứ sáu", "Thứ bảy"];
+    const trends = result.map(item => ({
+      day: weekdays[item.dayOfWeek - 1],
+      totalSpent: item.totalSpent,
+      transactionCount: item.count,
+      averageSpent: item.averageSpent
+    }));
+    
+    res.json({ success: true, trends });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// câu 12: Tổng hợp báo cáo tài chính cá nhân theo tháng
+exports.getMonthlyFinancialReport = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { year, month } = req.query;
+    const selectedYear = year ? parseInt(year) : new Date().getFullYear();
+    const selectedMonth = month ? parseInt(month) : new Date().getMonth() + 1;
+    
+    const startDate = new Date(selectedYear, selectedMonth - 1, 1);
+    const endDate = new Date(selectedYear, selectedMonth, 0, 23, 59, 59);
+    
+    // Tổng thu chi
+    const incomeExpense = await Transaction.aggregate([
+      { $match: { userId, date: { $gte: startDate, $lte: endDate } } },
+      { $group: { _id: "$type", total: { $sum: "$amount" } } }
+    ]);
+    const totalIncome = incomeExpense.find(i => i._id === "income")?.total || 0;
+    const totalExpense = incomeExpense.find(i => i._id === "expense")?.total || 0;
+    
+    // Chi tiêu theo danh mục (top 5)
+    const topExpenseCategories = await Transaction.aggregate([
+      { $match: { userId, type: "expense", date: { $gte: startDate, $lte: endDate } } },
+      {
+        $lookup: {
+          from: "categories",
+          localField: "categoryId",
+          foreignField: "_id",
+          as: "category"
+        }
+      },
+      { $unwind: "$category" },
+      {
+        $group: {
+          _id: { id: "$category._id", name: "$category.name" },
+          amount: { $sum: "$amount" }
+        }
+      },
+      { $sort: { amount: -1 } },
+      { $limit: 5 }
+    ]);
+    
+    // Số giao dịch
+    const transactionCount = await Transaction.countDocuments({ userId, date: { $gte: startDate, $lte: endDate } });
+    
+    // Ngân sách & chi tiêu thực tế
+    const budgets = await Budget.find({
+      userId,
+      startDate: { $lte: endDate },
+      endDate: { $gte: startDate },
+      status: "active"
+    }).populate("categoryId", "name");
+    
+    const budgetStatus = budgets.map(b => ({
+      category: b.categoryId.name,
+      budgetAmount: b.amount,
+      spent: b.spent,
+      remaining: b.amount - b.spent,
+      percentUsed: (b.spent / b.amount) * 100
+    }));
+    
+    res.json({
+      success: true,
+      period: { year: selectedYear, month: selectedMonth },
+      summary: {
+        totalIncome,
+        totalExpense,
+        balance: totalIncome - totalExpense,
+        transactionCount
+      },
+      topExpenseCategories: topExpenseCategories.map(c => ({ name: c._id.name, amount: c.amount })),
+      budgetStatus
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+};

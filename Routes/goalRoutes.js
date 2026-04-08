@@ -1,5 +1,5 @@
 const express = require('express');
-const { createGoal, getGoals, updateGoal, deleteGoal, getTotalSaved, getGoalProgress, searchGoalsByName } = require('../Controllers/goalController');
+const { createGoal, getGoals, updateGoal, deleteGoal, getTotalSaved, getGoalProgress, searchGoalsByName, sortGoalsByDeadline } = require('../Controllers/goalController');
 const { protect } = require('../Middleware/Auth');
 const router = express.Router();
 
@@ -11,5 +11,6 @@ router.delete('/:id', deleteGoal);
 router.get('/total-saved', getTotalSaved); // câu 6: Lấy tổng số tiền đã tiết kiệm được cho tất cả mục tiêu
 router.get('/progress', getGoalProgress); // câu 10: Tiến độ hoàn thành mục tiêu
 router.get('/search', searchGoalsByName); // câu 18: Tìm mục tiêu theo tên
+router.get('/sort-by-deadline', sortGoalsByDeadline); // câu 19
 
 module.exports = router;

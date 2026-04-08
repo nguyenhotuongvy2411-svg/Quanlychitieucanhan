@@ -184,3 +184,36 @@ exports.getBudgetRemaining = async (req, res) => {
     res.status(500).json({ success: false, error: error.message });
   }
 };  
+
+// câu 16: Lấy danh sách ngân sách kèm cảnh báo (số tiền còn lại)
+exports.getBudgetsWithWarning = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const budgets = await Budget.find({ userId, status: 'active' })
+      .populate('categoryId', 'name icon');
+    
+    const result = budgets.map(b => {
+      const remaining = b.amount - b.spent;
+      let warningLevel = 'normal';
+      if (b.spent >= b.amount) warningLevel = 'danger';
+      else if (b.spent >= b.amount * 0.8) warningLevel = 'warning';
+      
+      return {
+        _id: b._id,
+        category: b.categoryId,
+        budgetAmount: b.amount,
+        spent: b.spent,
+        remaining: remaining,
+        percentUsed: (b.spent / b.amount) * 100,
+        warningLevel,
+        period: b.period,
+        startDate: b.startDate,
+        endDate: b.endDate
+      };
+    });
+    
+    res.json({ success: true, budgets: result });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
