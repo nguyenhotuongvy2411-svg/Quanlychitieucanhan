@@ -63,25 +63,78 @@ exports.deleteGoal = async (req, res) => {
   }
 };
 
+// Rút tiền từ mục tiêu
+exports.withdrawSavedMoney = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { goalId, amount } = req.body;
+    
+    if (!goalId || !amount || amount <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Vui lòng cung cấp goalId và số tiền hợp lệ"
+      });
+    }
+    
+    const goal = await Goal.findOne({ _id: goalId, userId: userId });
+    if (!goal) {
+      return res.status(404).json({
+        success: false,
+        message: "Không tìm thấy mục tiêu"
+      });
+    }
+    
+    // Kiểm tra số dư
+    if (goal.currentAmount < amount) {
+      return res.status(400).json({
+        success: false,
+        message: `Số dư không đủ. Hiện có: ${goal.currentAmount.toLocaleString()}đ`
+      });
+    }
+    
+    // Cập nhật currentAmount
+    goal.currentAmount = goal.currentAmount - amount;
+    
+    // Cập nhật status nếu chưa đạt
+    if (goal.currentAmount < goal.targetAmount && goal.status === "completed") {
+      goal.status = "pending";
+    }
+    
+    await goal.save();
+    
+    res.json({
+      success: true,
+      message: `Đã rút ${amount.toLocaleString()}đ từ mục tiêu "${goal.name}"`,
+      goal: {
+        name: goal.name,
+        targetAmount: goal.targetAmount,
+        currentAmount: goal.currentAmount,
+        remainingAmount: goal.targetAmount - goal.currentAmount,
+        status: goal.status,
+        progress: (goal.currentAmount / goal.targetAmount) * 100
+      }
+    });
+    
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
 // câu 6: Tổng tiền tiết kiệm được (trong các mục tiêu)
+const mongoose = require('mongoose'); // thêm dòng này ở đầu file nếu chưa có
+
 exports.getTotalSaved = async (req, res) => {
   try {
     const userId = req.user.id;
-    // Tính tổng currentAmount của tất cả mục tiêu của user
+    // Chuyển userId từ string sang ObjectId để so sánh trong aggregate
+    const objectId = new mongoose.Types.ObjectId(userId);
+    
     const result = await Goal.aggregate([
-      { $match: { userId: userId } },
-      {
-        $group: {
-          _id: null,
-          totalSaved: { $sum: "$currentAmount" }
-        }
-      }
+      { $match: { userId: objectId } }, // dùng ObjectId
+      { $group: { _id: null, totalSaved: { $sum: "$currentAmount" } } }
     ]);
+    
     const totalSaved = result[0]?.totalSaved || 0;
-    res.json({
-      success: true,
-      totalSaved: totalSaved
-    });
+    res.json({ success: true, totalSaved });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }

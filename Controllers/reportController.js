@@ -135,13 +135,25 @@ exports.averageSpendingByWeekday = async (req, res) => {
   }
 };
 
-// câu 4: Lấy danh sách giao dịch kèm tổng tiền
+// câu 4: Lấy danh sách giao dịch kèm tổng tiền (lấy đến ngày chọn)
 exports.getTransactionsWithTotals = async (req, res) => {
   try {
     const userId = req.user._id;
+    const { date } = req.query; // Nhập ngày (format: YYYY-MM-DD)
+    // Xây dựng điều kiện lọc
+    let matchCondition = { userId: userId };
+    // Nếu có nhập ngày thì lọc tất cả giao dịch ĐẾN ngày đó
+    if (date) {
+      const endDate = new Date(date);
+      endDate.setHours(23, 59, 59, 999);
+      
+      matchCondition.date = {
+        $lte: endDate  // Lấy tất cả giao dịch <= ngày chọn
+      };
+    }
     // Bước 1: Lấy danh sách giao dịch (có join category)
     const transactions = await Transaction.aggregate([
-      { $match: { userId: userId } },
+      { $match: matchCondition },
       {
         $lookup: {
           from: "categories",
@@ -154,23 +166,29 @@ exports.getTransactionsWithTotals = async (req, res) => {
       { $sort: { date: -1 } }
     ]);
     // Bước 2: Tính tổng thu và tổng chi 
-    const totalIncome = await Transaction.aggregate([ // tính tổng thu
-      { $match: { userId: userId, type: "income" } },
+    const totalIncome = await Transaction.aggregate([
+      { $match: { ...matchCondition, type: "income" } },
       { $group: { _id: null, total: { $sum: "$amount" } } }
     ]);
-    const totalExpense = await Transaction.aggregate([ // tính tổng chi
-      { $match: { userId: userId, type: "expense" } },
+    const totalExpense = await Transaction.aggregate([
+      { $match: { ...matchCondition, type: "expense" } },
       { $group: { _id: null, total: { $sum: "$amount" } } }
     ]);
     // Bước 3: Trả kết quả
     res.json({
+      success: true,
+      filterDate: date || "all",
+      message: date ? `Tất cả giao dịch đến ngày ${date}` : "Tất cả giao dịch",
       transactions: transactions,
       totalIncome: totalIncome[0]?.total || 0,
       totalExpense: totalExpense[0]?.total || 0,
-      balance: (totalIncome[0]?.total || 0) - (totalExpense[0]?.total || 0) // tính số dư
+      balance: (totalIncome[0]?.total || 0) - (totalExpense[0]?.total || 0)
     });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ 
+      success: false, 
+      error: error.message 
+    });
   }
 };
 
