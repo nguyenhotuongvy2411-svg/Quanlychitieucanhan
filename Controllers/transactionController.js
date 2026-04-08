@@ -192,24 +192,35 @@ exports.getTransactions = async (req, res) => {
   }
 };
 
-// câu 14: Sắp xếp giao dịch theo số tiền hoặc ngày
+// câu 14: Sắp xếp giao dịch theo số tiền hoặc ngày (có lọc thời gian)
 exports.sortTransactions = async (req, res) => {
   try {
     const userId = req.user.id;
-    // Lấy tham số từ query string: ?sortBy=amount&order=desc
-    const { sortBy, order } = req.query;
-    // Mặc định: sắp xếp theo ngày mới nhất trước
+    // Lấy tham số từ query string
+    const { sortBy, order, startDate, endDate } = req.query;
+    // Mặc định: sắp xếp theo ngày giao dịch mới nhất trước
     let sortField = sortBy || 'date';
-    let sortOrder = order === 'asc' ? 1 : -1; // -1: giảm dần, 1: tăng dần
+    let sortOrder = order === 'asc' ? 1 : -1;
+    if (req.query.asc === '1') sortOrder = 1;   
+    if (req.query.desc === '1') sortOrder = -1; 
+    // Xây dựng điều kiện lọc
+    let matchCondition = { userId: userId };
+    // Lọc theo khoảng thời gian nếu có
+    if (startDate || endDate) {
+      matchCondition.date = {};
+      if (startDate) matchCondition.date.$gte = new Date(startDate);
+      if (endDate) matchCondition.date.$lte = new Date(endDate);
+    }
     // Tạo object sort
     let sortObject = {};
     sortObject[sortField] = sortOrder;
-    const transactions = await Transaction.find({ userId: userId })
+    const transactions = await Transaction.find(matchCondition)
       .populate('categoryId', 'name icon type')
       .sort(sortObject);
     res.json({
       success: true,
       count: transactions.length,
+      filters: { startDate: startDate || null, endDate: endDate || null },
       sortBy: sortField,
       order: sortOrder === 1 ? 'asc' : 'desc',
       transactions: transactions
@@ -220,13 +231,18 @@ exports.sortTransactions = async (req, res) => {
 };
 
 // câu 3: Tìm giao dịch có số tiền lớn hơn mức trung bình của user
+const mongoose = require('mongoose'); 
+
 exports.getTransactionsAboveAverage = async (req, res) => {
   try {
     const userId = req.user.id;
     
-    // Tính số tiền trung bình của tất cả giao dịch của user (không phân biệt loại)
+    // Chuyển userId thành ObjectId
+    const objectIdUserId = new mongoose.Types.ObjectId(userId);    
+
+    // Tính số tiền trung bình
     const avgResult = await Transaction.aggregate([
-      { $match: { userId: userId } },
+      { $match: { userId: objectIdUserId } },
       { $group: { _id: null, avgAmount: { $avg: "$amount" } } }
     ]);
     
@@ -246,6 +262,45 @@ exports.getTransactionsAboveAverage = async (req, res) => {
       averageAmount: avgAmount,
       count: transactions.length,
       transactions: transactions
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// câu 13: Lọc giao dịch với điều kiện (type, categoryId, paymentMethod)
+// Có thể lọc theo 1, 2 hoặc 3 tiêu chí cùng lúc
+exports.filterTransactions = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    // Lấy các tham số từ query string
+    const { type, categoryId, paymentMethod } = req.query;
+
+    // Xây dựng object filter
+    let filter = { userId: userId };
+
+    // Thêm điều kiện nếu có
+    if (type && ['income', 'expense', 'transfer'].includes(type)) {
+      filter.type = type;
+    }
+    if (categoryId) {
+      // Kiểm tra categoryId có hợp lệ không (tuỳ chọn)
+      filter.categoryId = categoryId;
+    }
+    if (paymentMethod && ['cash', 'credit', 'bank', 'other'].includes(paymentMethod)) {
+      filter.paymentMethod = paymentMethod;
+    }
+
+    // Truy vấn, populate thông tin category
+    const transactions = await Transaction.find(filter)
+      .populate('categoryId', 'name icon type')
+      .sort({ date: -1 }); // mới nhất trước
+
+    res.json({
+      success: true,
+      count: transactions.length,
+      filters: { type: type || null, categoryId: categoryId || null, paymentMethod: paymentMethod || null },
+      transactions: transactions,
     });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });

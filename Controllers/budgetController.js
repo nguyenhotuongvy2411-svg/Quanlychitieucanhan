@@ -64,20 +64,20 @@ exports.deleteBudget = async (req, res) => {
 };
 
 // câu 17: Tổng hợp số tiền còn lại trong mỗi ngân sách đến thời điểm hiện tại
+const mongoose = require('mongoose'); // Đảm bảo import mongoose
 exports.getBudgetRemaining = async (req, res) => {
   try {
     const userId = req.user.id;
+    const objectIdUserId = new mongoose.Types.ObjectId(userId); // Ép kiểu
     const currentDate = new Date();
-    // Lấy tất cả ngân sách của user (đang active)
+
     const budgets = await Budget.aggregate([
-      // 1. Lọc ngân sách của user, còn hiệu lực (endDate >= hiện tại)
       {
         $match: {
-          userId: userId,
-          endDate: { $gte: currentDate }
+          userId: objectIdUserId,          // Dùng ObjectId
+          // endDate: { $gte: currentDate }
         }
       },
-      // 2. Join với categories để lấy tên danh mục
       {
         $lookup: {
           from: "categories",
@@ -86,25 +86,23 @@ exports.getBudgetRemaining = async (req, res) => {
           as: "category"
         }
       },
-      // 3. Bỏ mảng category
       { $unwind: "$category" },
-      // 4. Lọc chỉ lấy danh mục chi tiêu (expense)
       { $match: { "category.type": "expense" } },
-      // 5. Join với transactions để tính chi tiêu thực tế
       {
         $lookup: {
           from: "transactions",
-          let: { 
+          let: {
             categoryId: "$categoryId",
             startDate: "$startDate",
-            endDate: "$endDate"
+            endDate: "$endDate",
+            uid: objectIdUserId             // Truyền ObjectId vào
           },
           pipeline: [
             {
               $match: {
                 $expr: {
                   $and: [
-                    { $eq: ["$userId", userId] },
+                    { $eq: ["$userId", "$$uid"] },      // So sánh ObjectId
                     { $eq: ["$type", "expense"] },
                     { $eq: ["$categoryId", "$$categoryId"] },
                     { $gte: ["$date", "$$startDate"] },
@@ -123,13 +121,11 @@ exports.getBudgetRemaining = async (req, res) => {
           as: "spending"
         }
       },
-      // 6. Lấy số tiền đã chi (hoặc 0 nếu chưa có)
       {
         $addFields: {
           spentAmount: { $ifNull: [{ $arrayElemAt: ["$spending.totalSpent", 0] }, 0] }
         }
       },
-      // 7. Tính số tiền còn lại trong ngân sách
       {
         $project: {
           _id: 1,
@@ -143,14 +139,9 @@ exports.getBudgetRemaining = async (req, res) => {
           endDate: 1,
           spentAmount: 1,
           remainingAmount: { $subtract: ["$amount", "$spentAmount"] },
-          // Tính phần trăm đã sử dụng
           usedPercentage: {
-            $multiply: [
-              { $divide: ["$spentAmount", "$amount"] },
-              100
-            ]
+            $multiply: [{ $divide: ["$spentAmount", "$amount"] }, 100]
           },
-          // Cảnh báo nếu vượt quá 80% hoặc 100%
           warning: {
             $switch: {
               branches: [
@@ -162,55 +153,73 @@ exports.getBudgetRemaining = async (req, res) => {
           }
         }
       },
-      // 8. Sắp xếp theo số tiền còn lại tăng dần (ngân sách cạn nhất lên đầu)
       { $sort: { remainingAmount: 1 } }
     ]);
-    // Tính tổng số tiền còn lại của tất cả ngân sách
+
     const totalRemaining = budgets.reduce((sum, b) => sum + b.remainingAmount, 0);
     const totalBudget = budgets.reduce((sum, b) => sum + b.budgetAmount, 0);
     const totalSpent = budgets.reduce((sum, b) => sum + b.spentAmount, 0);
+
     res.json({
       success: true,
       summary: {
-        totalBudget: totalBudget,
-        totalSpent: totalSpent,
-        totalRemaining: totalRemaining,
+        totalBudget,
+        totalSpent,
+        totalRemaining,
         averageUsage: totalBudget > 0 ? ((totalSpent / totalBudget) * 100).toFixed(2) : 0
       },
-      budgets: budgets
+      budgets
     });
-
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
-};  
+};
 
 // câu 16: Lấy danh sách ngân sách kèm cảnh báo (số tiền còn lại)
 exports.getBudgetsWithWarning = async (req, res) => {
   try {
     const userId = req.user.id;
-    const budgets = await Budget.find({ userId, status: 'active' })
-      .populate('categoryId', 'name icon');
+    const objectIdUserId = new mongoose.Types.ObjectId(userId);
     
-    const result = budgets.map(b => {
-      const remaining = b.amount - b.spent;
+    // Lấy tất cả budget active (có thể bỏ status nếu muốn lấy cả expired)
+    const budgets = await Budget.find({ userId, status: 'active' })
+      .populate('categoryId', 'name icon type');
+    
+    // Chỉ xử lý các budget thuộc danh mục chi tiêu (expense)
+    const expenseBudgets = budgets.filter(b => b.categoryId && b.categoryId.type === 'expense');
+    
+    // Tính tổng chi thực tế cho từng budget
+    const result = await Promise.all(expenseBudgets.map(async (budget) => {
+      const spentResult = await Transaction.aggregate([
+        {
+          $match: {
+            userId: objectIdUserId,
+            type: 'expense',
+            categoryId: budget.categoryId._id,
+            date: { $gte: budget.startDate, $lte: budget.endDate }
+          }
+        },
+        { $group: { _id: null, totalSpent: { $sum: "$amount" } } }
+      ]);
+      const spent = spentResult[0]?.totalSpent || 0;
+      const remaining = budget.amount - spent;
       let warningLevel = 'normal';
-      if (b.spent >= b.amount) warningLevel = 'danger';
-      else if (b.spent >= b.amount * 0.8) warningLevel = 'warning';
+      if (spent >= budget.amount) warningLevel = 'danger';
+      else if (spent >= budget.amount * 0.8) warningLevel = 'warning';
       
       return {
-        _id: b._id,
-        category: b.categoryId,
-        budgetAmount: b.amount,
-        spent: b.spent,
+        _id: budget._id,
+        category: budget.categoryId,
+        budgetAmount: budget.amount,
+        spent: spent,
         remaining: remaining,
-        percentUsed: (b.spent / b.amount) * 100,
+        percentUsed: (spent / budget.amount) * 100,
         warningLevel,
-        period: b.period,
-        startDate: b.startDate,
-        endDate: b.endDate
+        period: budget.period,
+        startDate: budget.startDate,
+        endDate: budget.endDate
       };
-    });
+    }));
     
     res.json({ success: true, budgets: result });
   } catch (error) {
