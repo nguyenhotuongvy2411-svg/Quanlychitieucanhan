@@ -1,5 +1,6 @@
 const { User, Transaction } = require('../Models');
 const bcrypt = require('bcryptjs');
+const {isValidId, badRequest, handleError  } = require('../Helper/validation&handleE')
 
 // Lấy thông tin cá nhân
 exports.getProfile = async (req, res) => {
@@ -15,6 +16,9 @@ exports.getProfile = async (req, res) => {
 exports.updateProfile = async (req, res) => {
   try {
     const { name, email, password, currency } = req.body;
+    if (email && !/^\S+@\S+\.\S+$/.test(email)) return badRequest(res, 'Email không hợp lệ');
+    if (password && password.length < 4) return badRequest(res, 'Mật khẩu tối thiểu 4 ký tự');
+
     const updateData = { name, email, currency };
     if (password) {
       const salt = await bcrypt.genSalt(10);

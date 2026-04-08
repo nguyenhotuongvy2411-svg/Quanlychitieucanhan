@@ -1,9 +1,13 @@
 const { Category } = require('../Models');
+const {isValidId, badRequest, handleError  } = require('../Helper/validation&handleE')
 
 // Tạo danh mục
 exports.createCategory = async (req, res) => {
   try {
     const { name, type, icon } = req.body;
+    if (!name?.trim()) return badRequest(res, 'Tên danh mục không được rỗng');
+    if (!['income', 'expense'].includes(type)) return badRequest(res, 'Type chỉ nhận income hoặc expense');
+
     const category = await Category.create({
       userId: req.user.id,
       name,
@@ -30,6 +34,7 @@ exports.getCategories = async (req, res) => {
 exports.updateCategory = async (req, res) => {
   try {
     const { id } = req.params;
+    if (!isValidId(id)) return badRequest(res, 'ID danh mục không hợp lệ');
     const category = await Category.findOneAndUpdate(
       { _id: id, userId: req.user.id },
       req.body,

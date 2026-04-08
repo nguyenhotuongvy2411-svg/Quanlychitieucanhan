@@ -1,4 +1,5 @@
 const { Transaction, Budget, Goal } = require('../Models');
+const {isValidId, badRequest, handleError  } = require('../Helper/validation&handleE')
 
 // Helper: cập nhật spent trong Budget khi tạo/xóa/sửa expense
 async function updateBudgetSpent(userId, categoryId, amountDelta, date) {
@@ -24,6 +25,18 @@ async function updateBudgetSpent(userId, categoryId, amountDelta, date) {
 exports.createTransaction = async (req, res) => {
   try {
     const { amount, type, categoryId, description, date, paymentMethod, goalId } = req.body;
+
+    if (!amount || amount <= 0) return badRequest(res, 'Số tiền phải lớn hơn 0');
+    if (!['income', 'expense', 'transfer'].includes(type)) return badRequest(res, 'Type không hợp lệ');
+    if (!['cash', 'credit', 'bank', 'other'].includes(paymentMethod || 'cash')) {
+      return badRequest(res, 'Phương thức thanh toán không hợp lệ');
+    }
+    if ((type === 'income' || type === 'expense') && !categoryId) return badRequest(res, 'Thiếu categoryId');
+    if (type === 'transfer' && !goalId) return badRequest(res, 'Transfer cần goalId');
+    if (categoryId && !isValidId(categoryId)) return badRequest(res, 'categoryId không hợp lệ');
+    if (goalId && !isValidId(goalId)) return badRequest(res, 'goalId không hợp lệ');
+    if (date && isNaN(new Date(date).getTime())) return badRequest(res, 'Ngày không hợp lệ');
+
     const transactionDate = date ? new Date(date) : new Date();
 
     // Kiểm tra nếu là transfer thì phải có goalId

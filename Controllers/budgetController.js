@@ -1,9 +1,18 @@
 const { Budget, Category, Transaction } = require('../Models');
+const {isValidId, badRequest, handleError  } = require('../Helper/validation&handleE')
 
 // Tạo ngân sách
 exports.createBudget = async (req, res) => {
   try {
     const { categoryId, amount, period, startDate, endDate } = req.body;
+    if (!isValidId(categoryId)) return badRequest(res, 'categoryId không hợp lệ');
+    if (!amount || amount <= 0) return badRequest(res, 'amount phải lớn hơn 0');
+    if (!['monthly', 'yearly'].includes(period)) return badRequest(res, 'period không hợp lệ');
+    if (isNaN(new Date(startDate).getTime()) || isNaN(new Date(endDate).getTime())) {
+      return badRequest(res, 'startDate/endDate không hợp lệ');
+    }
+    if (new Date(startDate) >= new Date(endDate)) return badRequest(res, 'startDate phải nhỏ hơn endDate');
+
     // Kiểm tra danh mục thuộc về user
     const category = await Category.findOne({ _id: categoryId, userId: req.user.id, type: 'expense' });
     if (!category) return res.status(400).json({ error: 'Danh mục không hợp lệ hoặc không phải chi tiêu' });

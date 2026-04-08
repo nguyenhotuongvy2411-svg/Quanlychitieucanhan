@@ -1,9 +1,14 @@
 const { Goal } = require('../Models');
+const {isValidId, badRequest, handleError  } = require('../Helper/validation&handleE')
 
 // Tạo mục tiêu
 exports.createGoal = async (req, res) => {
   try {
     const { name, targetAmount, deadline } = req.body;
+    if (!name?.trim()) return badRequest(res, 'Tên mục tiêu không được rỗng');
+    if (!targetAmount || targetAmount <= 0) return badRequest(res, 'targetAmount phải lớn hơn 0');
+    if (isNaN(new Date(deadline).getTime())) return badRequest(res, 'deadline không hợp lệ');
+
     const goal = await Goal.create({
       userId: req.user.id,
       name,
@@ -144,10 +149,11 @@ exports.getTotalSaved = async (req, res) => {
 exports.getGoalProgress = async (req, res) => {
   try {
     const userId = req.user.id;
+    const objectIdUserId = new mongoose.Types.ObjectId(userId); // Ép kiểu
 
     // Lấy tất cả mục tiêu của user và tính tiến độ
     const goals = await Goal.aggregate([
-      { $match: { userId: userId } },
+      { $match: { userId: objectIdUserId } },
       {
         $project: {
           _id: 1,
@@ -156,11 +162,17 @@ exports.getGoalProgress = async (req, res) => {
           currentAmount: 1,
           deadline: 1,
           status: 1,
-          // Tính phần trăm tiến độ
+          // Tính phần trăm tiến độ, tránh chia cho 0
           progress: {
-            $multiply: [
-              { $divide: ["$currentAmount", "$targetAmount"] },
-              100
+            $cond: [
+              { $eq: ["$targetAmount", 0] },
+              0,
+              {
+                $multiply: [
+                  { $divide: ["$currentAmount", "$targetAmount"] },
+                  100
+                ]
+              }
             ]
           },
           // Tính số tiền còn thiếu
@@ -216,7 +228,7 @@ exports.sortGoalsByDeadline = async (req, res) => {
   try {
     const userId = req.user.id;
     const { order } = req.query; // 'asc' hoặc 'desc', mặc định asc (gần nhất trước)
-    const sortOrder = order === 'desc' ? -1 : 1;
+    const sortOrder = order === 'asc' ? -1 : 1; //-1 : 1 đổi thứ tự
     
     const goals = await Goal.find({ userId })
       .sort({ deadline: sortOrder });

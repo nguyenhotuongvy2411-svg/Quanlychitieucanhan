@@ -1,11 +1,18 @@
 const { User } = require('../Models');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const {isValidId, badRequest, handleError  } = require('../Helper/validation&handleE')
 
 // Đăng ký
 exports.register = async (req, res) => {
   try {
     const { name, email, password, currency } = req.body;
+    if (!name?.trim()) return badRequest(res, 'Tên không được rỗng');
+    if (!email?.trim()) return badRequest(res, 'Email không được rỗng');
+    if (!/^\S+@\S+\.\S+$/.test(email)) return badRequest(res, 'Email không hợp lệ');
+    if (!password || password.length < 4) return badRequest(res, 'Mật khẩu tối thiểu 4 ký tự');
+    if (currency && !['VND', 'USD', 'EUR'].includes(currency)) return badRequest(res, 'Currency không hợp lệ');
+
     const existingUser = await User.findOne({ email });
     if (existingUser) return res.status(400).json({ error: 'Email đã tồn tại' });
 

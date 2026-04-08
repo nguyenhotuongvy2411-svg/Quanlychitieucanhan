@@ -1,5 +1,6 @@
 const { Transaction, Budget, Goal, Category } = require('../Models');
 const mongoose = require('mongoose');
+const {isValidId, badRequest, handleError  } = require('../Helper/validation&handleE')
 
 // Tổng thu, chi theo tháng
 exports.summaryByMonth = async (req, res) => {
@@ -196,25 +197,34 @@ exports.getTransactionsWithTotals = async (req, res) => {
 exports.getExpenseByCategoryInMonth = async (req, res) => {
   try {
     const userId = req.user.id;
-    // Lấy tháng và năm từ query, mặc định là tháng hiện tại
-    const { month, year } = req.query;
+    const objectIdUserId = new mongoose.Types.ObjectId(userId); // Ép kiểu
+
+    let { month, year } = req.query;
     const currentDate = new Date();
     const selectedMonth = month ? parseInt(month) : currentDate.getMonth() + 1;
     const selectedYear = year ? parseInt(year) : currentDate.getFullYear();
-    // Tính ngày đầu và cuối tháng
-    const startDate = new Date(selectedYear, selectedMonth - 1, 1);
-    const endDate = new Date(selectedYear, selectedMonth, 0, 23, 59, 59);
-    // Aggregate: lọc giao dịch chi trong tháng, group theo danh mục
+
+    // Kiểm tra tính hợp lệ
+    if (isNaN(selectedMonth) || selectedMonth < 1 || selectedMonth > 12 ||
+        isNaN(selectedYear) || selectedYear < 2000) {
+      return res.status(400).json({
+        success: false,
+        error: 'month (1-12) và year (>=2000) phải là số hợp lệ'
+      });
+    }
+
+    // Sử dụng UTC để tránh lệch múi giờ
+    const startDate = new Date(Date.UTC(selectedYear, selectedMonth - 1, 1, 0, 0, 0));
+    const endDate = new Date(Date.UTC(selectedYear, selectedMonth, 0, 23, 59, 59, 999));
+
     const result = await Transaction.aggregate([
-      // 1. Lọc giao dịch của user, loại chi, trong khoảng thời gian
       {
         $match: {
-          userId: userId,
+          userId: objectIdUserId,
           type: "expense",
           date: { $gte: startDate, $lte: endDate }
         }
       },
-      // 2. Join với categories để lấy tên danh mục
       {
         $lookup: {
           from: "categories",
@@ -223,9 +233,7 @@ exports.getExpenseByCategoryInMonth = async (req, res) => {
           as: "category"
         }
       },
-      // 3. Bỏ mảng category (chỉ lấy phần tử đầu)
-      { $unwind: "$category" },
-      // 4. Group theo danh mục, tính tổng chi
+      { $unwind: { path: "$category", preserveNullAndEmptyArrays: true } },
       {
         $group: {
           _id: {
@@ -237,7 +245,6 @@ exports.getExpenseByCategoryInMonth = async (req, res) => {
           transactionCount: { $sum: 1 }
         }
       },
-      // 5. Định dạng lại kết quả
       {
         $project: {
           _id: 0,
@@ -248,11 +255,11 @@ exports.getExpenseByCategoryInMonth = async (req, res) => {
           transactionCount: 1
         }
       },
-      // 6. Sắp xếp theo tổng tiền giảm dần (danh mục chi nhiều nhất lên đầu)
       { $sort: { totalAmount: -1 } }
     ]);
-    // Tính tổng chi tất cả danh mục
+
     const totalExpense = result.reduce((sum, item) => sum + item.totalAmount, 0);
+
     res.json({
       success: true,
       period: {
@@ -273,25 +280,35 @@ exports.getExpenseByCategoryInMonth = async (req, res) => {
 exports.getTop3ExpenseCategories = async (req, res) => {
   try {
     const userId = req.user.id;
-    // Lấy tháng và năm từ query, mặc định là tháng hiện tại
-    const { month, year } = req.query;
+    const objectIdUserId = new mongoose.Types.ObjectId(userId); // Ép kiểu
+
+    let { month, year } = req.query;
     const currentDate = new Date();
     const selectedMonth = month ? parseInt(month) : currentDate.getMonth() + 1;
     const selectedYear = year ? parseInt(year) : currentDate.getFullYear();
-    // Tính ngày đầu và cuối tháng
-    const startDate = new Date(selectedYear, selectedMonth - 1, 1);
-    const endDate = new Date(selectedYear, selectedMonth, 0, 23, 59, 59);
+
+    // Kiểm tra tính hợp lệ
+    if (isNaN(selectedMonth) || selectedMonth < 1 || selectedMonth > 12 ||
+        isNaN(selectedYear) || selectedYear < 2000) {
+      return res.status(400).json({
+        success: false,
+        error: 'month (1-12) và year (>=2000) phải là số hợp lệ'
+      });
+    }
+
+    // Sử dụng UTC để tránh lệch múi giờ
+    const startDate = new Date(Date.UTC(selectedYear, selectedMonth - 1, 1, 0, 0, 0));
+    const endDate = new Date(Date.UTC(selectedYear, selectedMonth, 0, 23, 59, 59, 999));
+
     // Aggregate: lấy top 3 danh mục chi nhiều nhất
     const result = await Transaction.aggregate([
-      // 1. Lọc giao dịch chi của user trong tháng
       {
         $match: {
-          userId: userId,
+          userId: objectIdUserId,
           type: "expense",
           date: { $gte: startDate, $lte: endDate }
         }
       },
-      // 2. Join với categories để lấy thông tin danh mục
       {
         $lookup: {
           from: "categories",
@@ -300,9 +317,7 @@ exports.getTop3ExpenseCategories = async (req, res) => {
           as: "category"
         }
       },
-      // 3. Bỏ mảng category (chỉ lấy phần tử đầu)
       { $unwind: "$category" },
-      // 4. Group theo danh mục, tính tổng chi
       {
         $group: {
           _id: {
@@ -315,11 +330,8 @@ exports.getTop3ExpenseCategories = async (req, res) => {
           transactionCount: { $sum: 1 }
         }
       },
-      // 5. Sắp xếp theo tổng tiền giảm dần
       { $sort: { totalAmount: -1 } },
-      // 6. Chỉ lấy top 3
       { $limit: 3 },
-      // 7. Định dạng lại kết quả
       {
         $project: {
           _id: 0,
@@ -331,13 +343,14 @@ exports.getTop3ExpenseCategories = async (req, res) => {
         }
       }
     ]);
-    // Tính tổng chi của top 3
+
     const totalTop3 = result.reduce((sum, item) => sum + item.totalAmount, 0);
-    // Tính tổng chi cả tháng (để biết top 3 chiếm bao nhiêu %)
+
+    // Tính tổng chi cả tháng
     const totalExpenseAll = await Transaction.aggregate([
       {
         $match: {
-          userId: userId,
+          userId: objectIdUserId,
           type: "expense",
           date: { $gte: startDate, $lte: endDate }
         }
@@ -345,6 +358,7 @@ exports.getTop3ExpenseCategories = async (req, res) => {
       { $group: { _id: null, total: { $sum: "$amount" } } }
     ]);
     const totalExpense = totalExpenseAll[0]?.total || 0;
+
     res.json({
       success: true,
       period: {
@@ -368,40 +382,35 @@ exports.getTop3ExpenseCategories = async (req, res) => {
 exports.getExpenseByDayOfWeek = async (req, res) => {
   try {
     const userId = req.user.id;
-    
-    // Lấy tháng và năm từ query, mặc định là tháng hiện tại
-    const { month, year } = req.query;
+    const objectIdUserId = new mongoose.Types.ObjectId(userId); // Ép kiểu
+
+    let { month, year } = req.query;
     const currentDate = new Date();
     const selectedMonth = month ? parseInt(month) : currentDate.getMonth() + 1;
     const selectedYear = year ? parseInt(year) : currentDate.getFullYear();
-    
-    // Tính ngày đầu và cuối tháng
-    const startDate = new Date(selectedYear, selectedMonth - 1, 1);
-    const endDate = new Date(selectedYear, selectedMonth, 0, 23, 59, 59);
-    
-    // Mảng ánh xạ thứ trong tuần (Tiếng Việt)
-    const dayOfWeekMap = {
-      0: "Chủ nhật",
-      1: "Thứ hai",
-      2: "Thứ ba",
-      3: "Thứ tư",
-      4: "Thứ năm",
-      5: "Thứ sáu",
-      6: "Thứ bảy"
-    };
-    
+
+    // Kiểm tra tính hợp lệ
+    if (isNaN(selectedMonth) || selectedMonth < 1 || selectedMonth > 12 ||
+        isNaN(selectedYear) || selectedYear < 2000) {
+      return res.status(400).json({
+        success: false,
+        error: 'month (1-12) và year (>=2000) phải là số hợp lệ'
+      });
+    }
+
+    // Sử dụng UTC để tránh lệch múi giờ
+    const startDate = new Date(Date.UTC(selectedYear, selectedMonth - 1, 1, 0, 0, 0));
+    const endDate = new Date(Date.UTC(selectedYear, selectedMonth, 0, 23, 59, 59, 999));
+
     // Aggregate: thống kê chi tiêu theo từng ngày trong tuần
     const result = await Transaction.aggregate([
-      // 1. Lọc giao dịch chi của user trong tháng
       {
         $match: {
-          userId: userId,
+          userId: objectIdUserId,
           type: "expense",
           date: { $gte: startDate, $lte: endDate }
         }
       },
-      
-      // 2. Join với categories để lấy tên danh mục
       {
         $lookup: {
           from: "categories",
@@ -410,14 +419,10 @@ exports.getExpenseByDayOfWeek = async (req, res) => {
           as: "category"
         }
       },
-      
-      // 3. Bỏ mảng category
-      { $unwind: "$category" },
-      
-      // 4. Thêm trường dayOfWeek (0-6) và tên thứ
+      { $unwind: { path: "$category", preserveNullAndEmptyArrays: true } },
       {
         $addFields: {
-          dayOfWeekNumber: { $dayOfWeek: "$date" }, // 1=Chủ nhật, 2=Thứ 2,...
+          dayOfWeekNumber: { $dayOfWeek: "$date" }, // 1=Chủ nhật, 2=Thứ 2,... 7=Thứ 7
           dayOfWeekName: {
             $switch: {
               branches: [
@@ -434,8 +439,6 @@ exports.getExpenseByDayOfWeek = async (req, res) => {
           }
         }
       },
-      
-      // 5. Group theo ngày trong tuần và danh mục (chi tiết)
       {
         $group: {
           _id: {
@@ -446,23 +449,20 @@ exports.getExpenseByDayOfWeek = async (req, res) => {
             categoryIcon: "$category.icon"
           },
           totalAmount: { $sum: "$amount" },
-          transactions: { 
+          transactions: {
             $push: {
               _id: "$_id",
               amount: "$amount",
               description: "$description",
               date: "$date",
-              paymentMethod: "$paymentMethod"
+              paymentMethod: "$paymentMethod",
+              categoryName: "$category.name"
             }
           },
           transactionCount: { $sum: 1 }
         }
       },
-      
-      // 6. Sắp xếp theo thứ tự ngày trong tuần
       { $sort: { "_id.dayOfWeekNumber": 1, "totalAmount": -1 } },
-      
-      // 7. Nhóm lại theo ngày trong tuần (tổng hợp từng ngày)
       {
         $group: {
           _id: {
@@ -483,8 +483,6 @@ exports.getExpenseByDayOfWeek = async (req, res) => {
           transactionCount: { $sum: "$transactionCount" }
         }
       },
-      
-      // 8. Sắp xếp lại và định dạng kết quả
       { $sort: { "_id.dayOfWeekNumber": 1 } },
       {
         $project: {
@@ -497,14 +495,11 @@ exports.getExpenseByDayOfWeek = async (req, res) => {
         }
       }
     ]);
-    
-    // Tính tổng chi cả tháng
+
     const totalExpense = result.reduce((sum, day) => sum + day.dayTotal, 0);
-    
-    // Tìm ngày chi tiêu nhiều nhất
-    const topDay = result.length > 0 ? 
+    const topDay = result.length > 0 ?
       result.reduce((max, day) => day.dayTotal > max.dayTotal ? day : max, result[0]) : null;
-    
+
     res.json({
       success: true,
       period: {
@@ -515,16 +510,15 @@ exports.getExpenseByDayOfWeek = async (req, res) => {
       },
       summary: {
         totalExpense: totalExpense,
-        averagePerDay: ((totalExpense / 7) || 0).toFixed(2), // Trung bình trên 7 ngày
+        averagePerDay: totalExpense > 0 ? ((totalExpense / 7).toFixed(2)) : 0,
         topDay: topDay ? {
           day: topDay.dayOfWeekName,
           amount: topDay.dayTotal,
-          percentage: ((topDay.dayTotal / totalExpense) * 100).toFixed(2)
+          percentage: totalExpense > 0 ? ((topDay.dayTotal / totalExpense) * 100).toFixed(2) : 0
         } : null
       },
       data: result
     });
-    
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
@@ -534,6 +528,8 @@ exports.getExpenseByDayOfWeek = async (req, res) => {
 exports.getHighestExpenseCategory = async (req, res) => {
   try {
     const userId = req.user.id;
+    const objectIdUserId = new mongoose.Types.ObjectId(userId);  // Ép kiểu
+
     const { month, year } = req.query;
     const currentDate = new Date();
     const selectedMonth = month ? parseInt(month) : currentDate.getMonth() + 1;
@@ -545,7 +541,7 @@ exports.getHighestExpenseCategory = async (req, res) => {
     const result = await Transaction.aggregate([
       {
         $match: {
-          userId: userId,
+          userId: objectIdUserId,        // Dùng ObjectId thay vì string
           type: "expense",
           date: { $gte: startDate, $lte: endDate }
         }
@@ -587,15 +583,45 @@ exports.getHighestExpenseCategory = async (req, res) => {
   }
 };
 
+
 // câu 7: Tổng thu, tổng chi theo tháng (không theo danh mục)
 exports.getMonthlySummary = async (req, res) => {
   try {
     const { year, month } = req.query;
-    const startDate = new Date(year, month - 1, 1);
-    const endDate = new Date(year, month, 0);
+    
+    // Kiểm tra tham số
+    if (!year || !month) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Vui lòng cung cấp year và month (ví dụ: ?year=2026&month=4)' 
+      });
+    }
+    
+    const selectedYear = parseInt(year);
+    const selectedMonth = parseInt(month);
+    
+    if (isNaN(selectedYear) || isNaN(selectedMonth) || selectedMonth < 1 || selectedMonth > 12) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'year và month phải là số hợp lệ (month từ 1 đến 12)' 
+      });
+    }
+    
+    // Tạo khoảng thời gian UTC để tránh lệch múi giờ
+    const startDate = new Date(Date.UTC(selectedYear, selectedMonth - 1, 1, 0, 0, 0));
+    const endDate = new Date(Date.UTC(selectedYear, selectedMonth, 0, 23, 59, 59, 999));
+    
+    // Ép kiểu userId
+    const userId = req.user._id || req.user.id;
+    const objectIdUserId = new mongoose.Types.ObjectId(userId);
     
     const result = await Transaction.aggregate([
-      { $match: { userId: req.user._id, date: { $gte: startDate, $lte: endDate } } },
+      { 
+        $match: { 
+          userId: objectIdUserId, 
+          date: { $gte: startDate, $lte: endDate } 
+        } 
+      },
       { $group: { _id: '$type', total: { $sum: '$amount' } } }
     ]);
     
@@ -604,8 +630,8 @@ exports.getMonthlySummary = async (req, res) => {
     
     res.json({
       success: true,
-      year: parseInt(year),
-      month: parseInt(month),
+      year: selectedYear,
+      month: selectedMonth,
       income,
       expense,
       balance: income - expense
@@ -651,13 +677,29 @@ exports.getBalanceOnDate = async (req, res) => {
 exports.getWeeklyTrend = async (req, res) => {
   try {
     const userId = req.user.id;
-    const { startDate, endDate } = req.query;
-    
-    let matchCondition = { userId: userId, type: "expense" };
+    const objectIdUserId = new mongoose.Types.ObjectId(userId); // Ép kiểu
+
+    let { startDate, endDate } = req.query;
+    let matchCondition = { 
+      userId: objectIdUserId, 
+      type: "expense" 
+    };
+
+    // Xử lý khoảng thời gian nếu có
     if (startDate && endDate) {
-      matchCondition.date = { $gte: new Date(startDate), $lte: new Date(endDate) };
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+        return res.status(400).json({ 
+          success: false, 
+          error: "startDate hoặc endDate không hợp lệ (định dạng YYYY-MM-DD)" 
+        });
+      }
+      // Đặt endDate về cuối ngày để bao gồm toàn bộ ngày
+      end.setHours(23, 59, 59, 999);
+      matchCondition.date = { $gte: start, $lte: end };
     }
-    
+
     const result = await Transaction.aggregate([
       { $match: matchCondition },
       {
@@ -677,7 +719,7 @@ exports.getWeeklyTrend = async (req, res) => {
       },
       { $sort: { dayOfWeek: 1 } }
     ]);
-    
+
     const weekdays = ["Chủ nhật", "Thứ hai", "Thứ ba", "Thứ tư", "Thứ năm", "Thứ sáu", "Thứ bảy"];
     const trends = result.map(item => ({
       day: weekdays[item.dayOfWeek - 1],
@@ -685,7 +727,7 @@ exports.getWeeklyTrend = async (req, res) => {
       transactionCount: item.count,
       averageSpent: item.averageSpent
     }));
-    
+
     res.json({ success: true, trends });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
@@ -696,24 +738,39 @@ exports.getWeeklyTrend = async (req, res) => {
 exports.getMonthlyFinancialReport = async (req, res) => {
   try {
     const userId = req.user.id;
-    const { year, month } = req.query;
-    const selectedYear = year ? parseInt(year) : new Date().getFullYear();
-    const selectedMonth = month ? parseInt(month) : new Date().getMonth() + 1;
-    
-    const startDate = new Date(selectedYear, selectedMonth - 1, 1);
-    const endDate = new Date(selectedYear, selectedMonth, 0, 23, 59, 59);
-    
+    const objectIdUserId = new mongoose.Types.ObjectId(userId); // Ép kiểu
+
+    let { year, month } = req.query;
+    const currentDate = new Date();
+    const selectedYear = year ? parseInt(year) : currentDate.getFullYear();
+    const selectedMonth = month ? parseInt(month) : currentDate.getMonth() + 1;
+
+    // Tạo khoảng thời gian UTC để tránh lệch múi giờ
+    const startDate = new Date(Date.UTC(selectedYear, selectedMonth - 1, 1, 0, 0, 0));
+    const endDate = new Date(Date.UTC(selectedYear, selectedMonth, 0, 23, 59, 59, 999));
+
     // Tổng thu chi
     const incomeExpense = await Transaction.aggregate([
-      { $match: { userId, date: { $gte: startDate, $lte: endDate } } },
+      { 
+        $match: { 
+          userId: objectIdUserId, 
+          date: { $gte: startDate, $lte: endDate } 
+        } 
+      },
       { $group: { _id: "$type", total: { $sum: "$amount" } } }
     ]);
     const totalIncome = incomeExpense.find(i => i._id === "income")?.total || 0;
     const totalExpense = incomeExpense.find(i => i._id === "expense")?.total || 0;
-    
+
     // Chi tiêu theo danh mục (top 5)
     const topExpenseCategories = await Transaction.aggregate([
-      { $match: { userId, type: "expense", date: { $gte: startDate, $lte: endDate } } },
+      { 
+        $match: { 
+          userId: objectIdUserId, 
+          type: "expense", 
+          date: { $gte: startDate, $lte: endDate } 
+        } 
+      },
       {
         $lookup: {
           from: "categories",
@@ -732,26 +789,29 @@ exports.getMonthlyFinancialReport = async (req, res) => {
       { $sort: { amount: -1 } },
       { $limit: 5 }
     ]);
-    
-    // Số giao dịch
-    const transactionCount = await Transaction.countDocuments({ userId, date: { $gte: startDate, $lte: endDate } });
-    
-    // Ngân sách & chi tiêu thực tế
+
+    // Số giao dịch (dùng find với ObjectId)
+    const transactionCount = await Transaction.countDocuments({
+      userId: objectIdUserId,
+      date: { $gte: startDate, $lte: endDate }
+    });
+
+    // Ngân sách & chi tiêu thực tế (dùng find với ObjectId)
     const budgets = await Budget.find({
-      userId,
+      userId: objectIdUserId,
       startDate: { $lte: endDate },
       endDate: { $gte: startDate },
       status: "active"
     }).populate("categoryId", "name");
-    
+
     const budgetStatus = budgets.map(b => ({
-      category: b.categoryId.name,
+      category: b.categoryId?.name || 'Không xác định',
       budgetAmount: b.amount,
       spent: b.spent,
       remaining: b.amount - b.spent,
-      percentUsed: (b.spent / b.amount) * 100
+      percentUsed: b.amount > 0 ? (b.spent / b.amount) * 100 : 0
     }));
-    
+
     res.json({
       success: true,
       period: { year: selectedYear, month: selectedMonth },
