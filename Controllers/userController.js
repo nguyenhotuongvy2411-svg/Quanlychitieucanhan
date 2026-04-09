@@ -1,4 +1,5 @@
 const { User, Transaction } = require('../Models');
+const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const {isValidId, badRequest, handleError  } = require('../Helper/validation&handleE')
 
@@ -31,36 +32,36 @@ exports.updateProfile = async (req, res) => {
   }
 };
 
-// câu 1: Lấy tất cả người dùng và tổng giao dịch của từng người (dành cho admin)
+// câu 1: Lấy tất cả người dùng và tổng giao dịch của từng người
 exports.getAllUsersWithTransactionTotals = async (req, res) => {
   try {
-    // Kiểm tra quyền admin (nếu có middleware riêng)
-    // if (req.user.role !== 'admin') {
-    //   return res.status(403).json({ success: false, message: 'Không có quyền truy cập' });
-    // }
-    // Bước 1: Lấy tất cả người dùng
-    const users = await User.find({}).select('-password'); // Không lấy password
-    // Bước 2: Với mỗi user, tính tổng thu và tổng chi từ giao dịch
+    // Kiểm tra quyền admin
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ success: false, message: 'Không có quyền truy cập' });
+    }
+    // Chỉ lấy những user có role = 'user'
+    const users = await User.find({ role: 'user' }).select('-password');
     const result = await Promise.all(
       users.map(async (user) => {
-        // Tính tổng thu
-        const totalIncome = await Transaction.aggregate([
-          { $match: { userId: user._id, type: "income" } },
-          { $group: { _id: null, total: { $sum: "$amount" } } }
+        const userIdObj = new mongoose.Types.ObjectId(user._id);  
+        const [totalIncome, totalExpense, transactionCount] = await Promise.all([
+          Transaction.aggregate([
+            { $match: { userId: userIdObj, type: "income" } },
+            { $group: { _id: null, total: { $sum: "$amount" } } }
+          ]),
+          Transaction.aggregate([
+            { $match: { userId: userIdObj, type: "expense" } },
+            { $group: { _id: null, total: { $sum: "$amount" } } }
+          ]),
+          Transaction.countDocuments({ userId: user._id })
         ]);
-        // Tính tổng chi
-        const totalExpense = await Transaction.aggregate([
-          { $match: { userId: user._id, type: "expense" } },
-          { $group: { _id: null, total: { $sum: "$amount" } } }
-        ]);
-        // Tính tổng số giao dịch
-        const transactionCount = await Transaction.countDocuments({ userId: user._id });
         return {
           user: {
             _id: user._id,
             name: user.name,
             email: user.email,
             currency: user.currency,
+            role: user.role,
             createdAt: user.createdAt
           },
           stats: {
@@ -72,12 +73,7 @@ exports.getAllUsersWithTransactionTotals = async (req, res) => {
         };
       })
     );
-    res.json({
-      success: true,
-      count: result.length,
-      users: result
-    });
-
+    res.json({ success: true, count: result.length, users: result });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }

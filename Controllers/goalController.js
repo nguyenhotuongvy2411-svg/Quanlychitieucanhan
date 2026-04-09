@@ -145,15 +145,22 @@ exports.getTotalSaved = async (req, res) => {
   }
 };
 
-// [D] CÂU 10: Tiến độ hoàn thành mục tiêu
+// [D] CÂU 10: Tiến độ hoàn thành mục tiêu (có lọc theo tên)
 exports.getGoalProgress = async (req, res) => {
   try {
     const userId = req.user.id;
-    const objectIdUserId = new mongoose.Types.ObjectId(userId); // Ép kiểu
+    const { name } = req.query; // Lấy tên mục tiêu từ query (nếu có)
+    const objectIdUserId = new mongoose.Types.ObjectId(userId);
 
-    // Lấy tất cả mục tiêu của user và tính tiến độ
+    // Xây dựng điều kiện match
+    let matchCondition = { userId: objectIdUserId };
+    if (name) {
+      // Tìm kiếm gần đúng, không phân biệt hoa thường
+      matchCondition.name = { $regex: name, $options: 'i' };
+    }
+
     const goals = await Goal.aggregate([
-      { $match: { userId: objectIdUserId } },
+      { $match: matchCondition },
       {
         $project: {
           _id: 1,
@@ -162,34 +169,25 @@ exports.getGoalProgress = async (req, res) => {
           currentAmount: 1,
           deadline: 1,
           status: 1,
-          // Tính phần trăm tiến độ, tránh chia cho 0
           progress: {
             $cond: [
               { $eq: ["$targetAmount", 0] },
               0,
-              {
-                $multiply: [
-                  { $divide: ["$currentAmount", "$targetAmount"] },
-                  100
-                ]
-              }
+              { $multiply: [{ $divide: ["$currentAmount", "$targetAmount"] }, 100] }
             ]
           },
-          // Tính số tiền còn thiếu
-          remaining: {
-            $subtract: ["$targetAmount", "$currentAmount"]
-          }
+          remaining: { $subtract: ["$targetAmount", "$currentAmount"] }
         }
       },
-      { $sort: { progress: -1 } } // Sắp xếp mục tiêu gần hoàn thành lên đầu
+      { $sort: { progress: -1 } }
     ]);
 
     res.json({
       success: true,
       count: goals.length,
+      keyword: name || null,
       goals: goals
     });
-
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
