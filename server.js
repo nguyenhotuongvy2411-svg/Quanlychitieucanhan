@@ -11,8 +11,8 @@ app.use(express.urlencoded({ extended: true }));
 
 // Kết nối MongoDB
 mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/quanlychitieucanhan')
-  .then(() => console.log('✅ Kết nối MongoDB thành công'))
-  .catch(err => console.error('❌ Lỗi kết nối MongoDB:', err));
+  .then(() => console.log('Kết nối MongoDB thành công'))
+  .catch(err => console.error('Lỗi kết nối MongoDB:', err));
 
 // Routes
 app.use('/api/auth', require('./Routes/authRoutes'));
@@ -40,6 +40,6 @@ app.use((err, req, res, next) => {
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`🚀 Server đang chạy trên port ${PORT}`);
-  console.log(`📌 Truy cập: http://localhost:${PORT}`);
+  console.log(` Server đang chạy trên port ${PORT}`);
+  console.log(` Truy cập: http://localhost:${PORT}`);
 });
