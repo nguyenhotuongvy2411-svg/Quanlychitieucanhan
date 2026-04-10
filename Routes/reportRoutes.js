@@ -28,10 +28,10 @@ router.get('/transactions-with-totals', getTransactionsWithTotals); // câu 4: L
 router.get('/expense-by-category', getExpenseByCategoryInMonth); // câu 2: Tổng chi theo từng danh mục trong tháng
 router.get('/top-3', getTop3ExpenseCategories); // câu 9: Top 3 danh mục chi tiêu nhiều nhất trong tháng
 router.get('/expense', getExpenseByDayOfWeek); // câu 20: Liệt kê chi tiêu chi tiết theo từng ngày trong tuần
-router.get('/highest-expense-category', getHighestExpenseCategory); // câu 5
-router.get('/monthly-summary', getMonthlySummary); // câu 7
-router.get('/balance-on-date', getBalanceOnDate); // câu 8
-router.get('/weekly-trend', getWeeklyTrend); // câu 11
-router.get('/monthly-report', getMonthlyFinancialReport); // câu 12
+router.get('/highest-expense-category', getHighestExpenseCategory); // câu 5: Tìm danh mục chi tiêu cao nhất trong tháng
+router.get('/monthly-summary', getMonthlySummary); // câu 7: Tổng thu, tổng chi theo tháng (k theo từng danh mục mà kiểu chung chung)
+router.get('/balance-on-date', getBalanceOnDate); // câu 8: Số dư theo ngày cụ thể (kể cả hiện tại)
+router.get('/weekly-trend', getWeeklyTrend); // câu 11: Thống kê chi tiêu theo ngày trong tuần (phân tích xu hướng)
+router.get('/monthly-report', getMonthlyFinancialReport); // câu 12: Tổng hợp báo cáo tài chính cá nhân theo tháng
 
 module.exports = router;
