@@ -6,7 +6,7 @@ const {isValidId, badRequest, handleError  } = require('../Helper/validation&han
 // Lấy thông tin cá nhân
 exports.getProfile = async (req, res) => {
   try {
-    const user = await User.findById(req.user.id).select('-password');
+    const user = await User.findById(req.user.id).select('-password'); //tìm id
     res.json(user);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -25,7 +25,7 @@ exports.updateProfile = async (req, res) => {
       const salt = await bcrypt.genSalt(10);
       updateData.password = await bcrypt.hash(password, salt);
     }
-    const user = await User.findByIdAndUpdate(req.user.id, updateData, { new: true }).select('-password');
+    const user = await User.findByIdAndUpdate(req.user.id, updateData, { new: true }).select('-password'); //Cập nhật theo id
     res.json(user);
   } catch (error) {
     res.status(500).json({ error: error.message });

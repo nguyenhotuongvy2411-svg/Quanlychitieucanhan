@@ -179,7 +179,7 @@ exports.deleteTransaction = async (req, res) => {
 // Tìm kiếm, lọc, sắp xếp giao dịch
 exports.getTransactions = async (req, res) => {
   try {
-    const { categoryId, startDate, endDate, type, paymentMethod, sortBy, order } = req.query;
+    const { categoryId, startDate, endDate, type, paymentMethod, sortBy, order } = req.query; //Tham số trên query string (VD: ?page=1&sort=asc)
     const filter = { userId: req.user.id };
     if (categoryId) filter.categoryId = categoryId;
     if (type) filter.type = type;

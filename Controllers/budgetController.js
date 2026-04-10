@@ -4,8 +4,8 @@ const {isValidId, badRequest, handleError  } = require('../Helper/validation&han
 // Tạo ngân sách
 exports.createBudget = async (req, res) => {
   try {
-    const { categoryId, amount, period, startDate, endDate } = req.body;
-    if (!isValidId(categoryId)) return badRequest(res, 'categoryId không hợp lệ');
+    const { categoryId, amount, period, startDate, endDate } = req.body; //Dữ liệu gửi lên từ client (POST, PUT)
+    if (!isValidId(categoryId)) return badRequest(res, 'categoryId không hợp lệ'); //isValidId Kiểm tra ObjectId hợp lệ (tránh lỗi CastError)
     if (!amount || amount <= 0) return badRequest(res, 'amount phải lớn hơn 0');
     if (!['monthly', 'yearly'].includes(period)) return badRequest(res, 'period không hợp lệ');
     if (isNaN(new Date(startDate).getTime()) || isNaN(new Date(endDate).getTime())) {
@@ -14,10 +14,10 @@ exports.createBudget = async (req, res) => {
     if (new Date(startDate) >= new Date(endDate)) return badRequest(res, 'startDate phải nhỏ hơn endDate');
 
     // Kiểm tra danh mục thuộc về user
-    const category = await Category.findOne({ _id: categoryId, userId: req.user.id, type: 'expense' });
+    const category = await Category.findOne({ _id: categoryId, userId: req.user.id, type: 'expense' });    //findOne Tìm một bản ghi
     if (!category) return res.status(400).json({ error: 'Danh mục không hợp lệ hoặc không phải chi tiêu' });
 
-    const budget = await Budget.create({
+    const budget = await Budget.create({ //
       userId: req.user.id,
       categoryId,
       amount,
@@ -36,8 +36,8 @@ exports.createBudget = async (req, res) => {
 // Lấy danh sách ngân sách (kèm số tiền đã chi)
 exports.getBudgets = async (req, res) => {
   try {
-    const budgets = await Budget.find({ userId: req.user.id, status: 'active' })
-      .populate('categoryId', 'name icon');
+    const budgets = await Budget.find({ userId: req.user.id, status: 'active' }) //Lấy userId từ middleware auth (xác thực), find thì tìm nhiều bản ghi
+      .populate('categoryId', 'name icon');   //Join dữ liệu từ collection khác
     res.json(budgets);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -47,7 +47,7 @@ exports.getBudgets = async (req, res) => {
 // Cập nhật ngân sách
 exports.updateBudget = async (req, res) => {
   try {
-    const { id } = req.params;
+    const { id } = req.params;  //Tham số trên URL (VD: /:id)
     const budget = await Budget.findOneAndUpdate(
       { _id: id, userId: req.user.id },
       req.body,
@@ -77,7 +77,7 @@ const mongoose = require('mongoose'); // Đảm bảo import mongoose
 exports.getBudgetRemaining = async (req, res) => {
   try {
     const userId = req.user.id;
-    const objectIdUserId = new mongoose.Types.ObjectId(userId); // Ép kiểu
+    const objectIdUserId = new mongoose.Types.ObjectId(userId); // Ép kiểu string thành ObjectId (dùng trong aggregate)
     const currentDate = new Date();
 
     const budgets = await Budget.aggregate([
@@ -199,7 +199,7 @@ exports.getBudgetsWithWarning = async (req, res) => {
     
     // Tính tổng chi thực tế cho từng budget
     const result = await Promise.all(expenseBudgets.map(async (budget) => {
-      const spentResult = await Transaction.aggregate([
+      const spentResult = await Transaction.aggregate([   //aggregate(pipeline)	Pipeline aggregation (thống kê phức tạp, join, tính toán)
         {
           $match: {
             userId: objectIdUserId,

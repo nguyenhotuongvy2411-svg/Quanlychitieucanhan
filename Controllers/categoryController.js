@@ -62,7 +62,7 @@ exports.deleteCategory = async (req, res) => {
 // câu 15: Kiểm tra danh mục đã tồn tại (theo tên, loại, userId)
 exports.checkCategoryExists = async (req, res) => {
   try {
-    const { name, type } = req.query;
+    const { name, type } = req.query;   //Tham số trên query string (VD: ?page=1&sort=asc)
     if (!name || !type) {
       return res.status(400).json({ success: false, error: "Vui lòng cung cấp name và type" });
     }

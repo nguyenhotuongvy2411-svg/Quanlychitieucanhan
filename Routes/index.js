@@ -67,4 +67,16 @@ router.get('/', (req, res) => {
   res.json({ message: 'API Quản Lý Chi Tiêu Cá Nhân' });
 });
 
+
+// const result = await Model.aggregate([
+//   { $match: { userId: objectId, type: 'expense', date: { $gte: start, $lte: end } } },  //lọc dữ liệu (giống WHERE trong SQL)
+//   { $lookup: { from: 'categories', localField: 'categoryId', foreignField: '_id', as: 'category' } }, // join với collection khác
+//   { $unwind: '$category' },  //giải nén mảng (sau $lookup thường có mảng 1 phần tử)
+//   { $group: { _id: '$category.name', total: { $sum: '$amount' } } },  //nhóm theo một trường, tính tổng/trung bình/đếm
+//   { $sort: { total: -1 } }, //sắp xếp
+//   { $limit: 5 },  //iới hạn số lượng
+//   { $project: { categoryName: '$_id', totalAmount: '$total', _id: 0 } }  //$project / $addFields: thêm, bớt, đổi tên, tính toán trường mới $expr: dùng biểu thức trong $match (so sánh giữa các trường) $cond, $switch: logic if-else
+// ]);
+
+
 module.exports = router;

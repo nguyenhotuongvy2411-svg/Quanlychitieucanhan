@@ -33,7 +33,7 @@ exports.getGoals = async (req, res) => {
     if (sortBy === 'deadline') sort.deadline = 1;
     else sort.createdAt = -1;
 
-    const goals = await Goal.find(filter).sort(sort);
+    const goals = await Goal.find(filter).sort(sort);  //Sắp xếp kết quả
     res.json(goals);
   } catch (error) {
     res.status(500).json({ error: error.message });
