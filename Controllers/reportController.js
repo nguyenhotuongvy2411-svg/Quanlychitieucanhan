@@ -673,61 +673,69 @@ exports.getBalanceOnDate = async (req, res) => {
   }
 };
 
-// câu 11: Thống kê chi tiêu theo ngày trong tuần (phân tích xu hướng)
+// CÂU 11: Thống kê chi tiêu theo ngày trong tuần (phân tích xu hướng)
 exports.getWeeklyTrend = async (req, res) => {
   try {
+    // Lấy userId từ token (do middleware protect cung cấp)
     const userId = req.user.id;
-    const objectIdUserId = new mongoose.Types.ObjectId(userId); // Ép kiểu
-
+    //  Ép kiểu userId thành ObjectId (cần cho aggregate $match)
+    const objectIdUserId = new mongoose.Types.ObjectId(userId);
+    // Lấy tham số lọc khoảng thời gian từ query (nếu có)
     let { startDate, endDate } = req.query;
+    // Khởi tạo điều kiện lọc cơ bản: chỉ lấy giao dịch chi của user hiện tại
     let matchCondition = { 
       userId: objectIdUserId, 
       type: "expense" 
     };
-
-    // Xử lý khoảng thời gian nếu có
+    // Xử lý khoảng thời gian nếu người dùng truyền vào
     if (startDate && endDate) {
       const start = new Date(startDate);
       const end = new Date(endDate);
+      // Kiểm tra định dạng ngày hợp lệ
       if (isNaN(start.getTime()) || isNaN(end.getTime())) {
         return res.status(400).json({ 
           success: false, 
           error: "startDate hoặc endDate không hợp lệ (định dạng YYYY-MM-DD)" 
         });
       }
-      // Đặt endDate về cuối ngày để bao gồm toàn bộ ngày
+      // Đặt endDate về cuối ngày để bao gồm toàn bộ ngày (23:59:59)
       end.setHours(23, 59, 59, 999);
       matchCondition.date = { $gte: start, $lte: end };
     }
-
+    // Aggregate pipeline
     const result = await Transaction.aggregate([
+      // Stage 1: Lọc dữ liệu theo điều kiện đã xây dựng
       { $match: matchCondition },
+      // Stage 2: Nhóm theo ngày trong tuần (1 = Chủ nhật, 2 = Thứ 2, ... 7 = Thứ 7)
       {
         $group: {
-          _id: { $dayOfWeek: "$date" },
-          totalSpent: { $sum: "$amount" },
-          count: { $sum: 1 }
+          _id: { $dayOfWeek: "$date" },   // lấy số thứ tự ngày trong tuần
+          totalSpent: { $sum: "$amount" }, // tổng chi tiêu của ngày đó
+          count: { $sum: 1 }               // số lượng giao dịch trong ngày đó
         }
       },
+      // Stage 3: Tính toán thêm các trường phụ (trung bình mỗi giao dịch)
       {
         $project: {
           dayOfWeek: "$_id",
           totalSpent: 1,
           count: 1,
-          averageSpent: { $divide: ["$totalSpent", "$count"] }
+          averageSpent: { $divide: ["$totalSpent", "$count"] } // tổng/số lượng
         }
       },
+      // Stage 4: Sắp xếp theo thứ tự từ Chủ nhật đến Thứ bảy
       { $sort: { dayOfWeek: 1 } }
     ]);
-
+    // Ánh xạ số (1-7) thành tên tiếng Việt
     const weekdays = ["Chủ nhật", "Thứ hai", "Thứ ba", "Thứ tư", "Thứ năm", "Thứ sáu", "Thứ bảy"];
+    // Định dạng lại kết quả trả về cho dễ đọc
     const trends = result.map(item => ({
-      day: weekdays[item.dayOfWeek - 1],
+      day: weekdays[item.dayOfWeek - 1], // vì mảng bắt đầu từ 0
       totalSpent: item.totalSpent,
       transactionCount: item.count,
       averageSpent: item.averageSpent
     }));
-
+    // Trả về kết quả thành công
     res.json({ success: true, trends });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
